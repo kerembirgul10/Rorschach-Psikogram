@@ -12,37 +12,39 @@ GRUP_2 = [
     "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"
 ]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
-ELENECEK_KODLAR = ["Ban", "Reddetme", "Şok"]
+OZEL_GRUP = ["Ban", "Reddetme", "Şok"]
 
-# --- GİRİŞ ALANLARI (TAMAMEN ALT ALTA) ---
+# --- GİRİŞ ALANLARI ---
 st.subheader("Kart Yanıtlarını Girin")
 kart_verileri = []
 
-# 1'den 10'a kadar tüm kartlar alt alta sıralanır
 for i in range(1, 11):
     kod_girisi = st.text_area(f"Kart {i}:", key=f"kart_{i}", height=100)
     kart_verileri.append(kod_girisi)
 
 st.divider()
-l14_degeri = st.number_input("🎯 L14 Değerini Girin:", value=7.0)
+l14_degeri = st.number_input("🎯 L14 Değeri:", value=7.0)
 
 if st.button("🚀 Analizi Başlat"):
     toplam_r_sayisi = 0
     tum_gecerli_kodlar = []
+    ozel_kodlar_listesi = []
     
     for ham_veri in kart_verileri:
         if ham_veri.strip():
             satirlar = ham_veri.strip().split('\n')
             for satir in satirlar:
                 temiz_satir = satir.strip()
-                # 1. KURAL: Sadece "Reddetme" yazan yanıtı R olarak kabul etme
+                # Sadece "Reddetme" yazan yanıtı R olarak kabul etme
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
                 toplam_r_sayisi += 1
                 kelimeler = temiz_satir.replace(",", " ").split()
                 for k in kelimeler:
-                    if k not in ELENECEK_KODLAR and k != "":
+                    if k in OZEL_GRUP:
+                        ozel_kodlar_listesi.append(k)
+                    elif k != "":
                         tum_gecerli_kodlar.append(k)
 
     if toplam_r_sayisi > 0:
@@ -63,35 +65,55 @@ if st.button("🚀 Analizi Başlat"):
 
         st.divider()
 
-        # --- KOD DAĞILIMI (GRUPLARA GÖRE ALT ALTA SIRALAMA) ---
+        # --- KOD DAĞILIMI ---
         st.subheader("🔍 Kod Dağılım Analizi")
         kod_sayilari = Counter(tum_gecerli_kodlar)
+        ozel_sayilari = Counter(ozel_kodlar_listesi)
         
-        # Sonuçlar yine yan yana sütunlarda ama içerikleri dikey sıralı
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3 = st.columns(3)
         
-        hepsi = set(GRUP_1 + GRUP_2 + GRUP_3)
-
         with c1:
+            st.markdown("**1. Grup**")
             for k in GRUP_1:
                 if kod_sayilari[k] > 0:
                     st.write(f"**{k}:** {kod_sayilari[k]}")
         
         with c2:
+            st.markdown("**2. Grup**")
             for k in GRUP_2:
                 if kod_sayilari[k] > 0:
                     st.write(f"**{k}:** {kod_sayilari[k]}")
         
         with c3:
+            st.markdown("**3. Grup**")
             for k in GRUP_3:
                 if kod_sayilari[k] > 0:
                     st.write(f"**{k}:** {kod_sayilari[k]}")
+
+        st.divider()
         
-        with c4:
-            st.write("*İstisna/Diğer:*")
+        # --- ALT KISIM: ÖZEL GRUP VE İSTİSNALAR ---
+        alt_c1, alt_c2 = st.columns(2)
+        
+        with alt_c1:
+            st.markdown("**🛡️ Yan Dal (Ban/Şok/Red)**")
+            for k in OZEL_GRUP:
+                if ozel_sayilari[k] > 0:
+                    st.write(f"**{k}:** {ozel_sayilari[k]}")
+
+        with alt_c2:
+            st.markdown("**⚠️ İstisnalar (Tanımsız)**")
+            hepsi = set(GRUP_1 + GRUP_2 + GRUP_3 + OZEL_GRUP)
+            # İstisnaları bir kutu (info) içinde gösterelim
+            istisna_metni = ""
             for k, adet in kod_sayilari.items():
                 if k not in hepsi:
-                    st.write(f"**{k}:** {adet}")
+                    istisna_metni += f"**{k}:** {adet}  \n"
+            
+            if istisna_metni:
+                st.info(istisna_metni)
+            else:
+                st.write("İstisna kod bulunamadı.")
                     
     else:
         st.error("Hesaplanacak geçerli bir (R) yanıtı bulunamadı.")
