@@ -3,7 +3,7 @@ from collections import Counter
 
 st.set_page_config(page_title="Rorschach Psikogram", layout="wide")
 
-# Başlık Güncellemesi
+# Başlık
 st.title("📊 Rorschach Psikogram")
 
 # --- GRUP TANIMLAMALARI ---
@@ -21,7 +21,6 @@ HEPSI_TANIMLI = set(GRUP_1 + GRUP_2 + GRUP_3 + YAN_DAL)
 st.subheader("Kartlar")
 kart_verileri = []
 
-# Kartları tam genişlikte alt alta sıralıyoruz
 for i in range(1, 11):
     kod_girisi = st.text_area(f"Kart {i}", key=f"kart_{i}", height=80)
     kart_verileri.append(kod_girisi)
@@ -35,7 +34,6 @@ if st.button("🚀 Analiz"):
             satirlar = ham_veri.strip().split('\n')
             for satir in satirlar:
                 temiz_satir = satir.strip()
-                # "Reddetme" tek başına bir yanıt ise R sayma
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
@@ -46,30 +44,38 @@ if st.button("🚀 Analiz"):
                         tum_kodlar.append(k)
 
     if toplam_r_sayisi > 0:
-        st.subheader(f"R:{toplam_r_sayisi}")
-        st.divider()
-
+        # Kodları say
         kod_sayilari = Counter(tum_kodlar)
         
-        # --- KODLARI YAN YANA GÖSTERME (GRUP GRUP) ---
+        # --- HESAPLAMALAR (%G ve %D) ---
+        g_sayisi = kod_sayilari["G"]
+        d_sayisi = kod_sayilari["D"]
         
-        # Fonksiyon: Grubu yatayda yazdırır
+        g_orani = (g_sayisi / toplam_r_sayisi) * 100
+        d_orani = (d_sayisi / toplam_r_sayisi) * 100
+
+        # Üst Bilgi Satırı
+        st.subheader(f"R:{toplam_r_sayisi}")
+        
+        # Oranları Yan Yana Göster
+        col_g, col_d = st.columns(2)
+        col_g.metric("%G", f"%{g_orani:.0f}")
+        col_d.metric("%D", f"%{d_orani:.0f}")
+        
+        st.divider()
+
+        # --- KODLARI YATAY GRUPLAR HALİNDE GÖSTER ---
         def grubu_yazdir(liste):
-            cols = st.columns(len(liste))
             bulunanlar = [k for k in liste if kod_sayilari[k] > 0]
             if bulunanlar:
-                render_cols = st.columns(len(bulunanlar))
+                render_cols = st.columns(len(bulunanlar) if len(bulunanlar) > 0 else 1)
                 for idx, k in enumerate(bulunanlar):
                     render_cols[idx].write(f"**{k}:** {kod_sayilari[k]}")
-                st.write("") # Alt gruba geçmeden önce boşluk
+                st.write("") 
 
-        # 1. Grup (G, D...)
         grubu_yazdir(GRUP_1)
-        # 2. Grup (F, FC...)
         grubu_yazdir(GRUP_2)
-        # 3. Grup (H, A...)
         grubu_yazdir(GRUP_3)
-        # Yan Dal (Ban, Şok...)
         grubu_yazdir(YAN_DAL)
 
         st.divider()
@@ -79,10 +85,8 @@ if st.button("🚀 Analiz"):
         if istisnalar:
             istisna_metni = ""
             for k in istisnalar:
-                istisna_metni += f"**{k}:** {kod_sayilari[k]} &nbsp;&nbsp;&nbsp; " # Yan yana boşluklu
-            
+                istisna_metni += f"**{k}:** {kod_sayilari[k]} &nbsp;&nbsp;&nbsp; "
             st.info(istisna_metni)
                     
     else:
         st.error("Giriş yapılmadı.")
-    
