@@ -39,6 +39,12 @@ st.markdown("""
 
 st.title("Rorschach Klinik Analiz ve Protokol")
 
+# --- GRUPLARIN TANIMLANMASI ---
+GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
+GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
+GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
+YAN_DAL = ["Ban", "Reddetme", "Şok"]
+
 # --- 1. BÖLÜM: HASTA BİLGİLERİ ---
 st.subheader("Hasta Bilgileri")
 c1, c2 = st.columns([3, 1])
@@ -75,12 +81,12 @@ for i in range(1, 11):
     col_yanit, col_anket = st.columns(2)
     with col_yanit: yanit = st.text_area("Yanıtlar", key=f"yanit_{i}", height=100)
     with col_anket: anket = st.text_area("Anket", key=f"anket_{i}", height=100)
-    kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="")
+    kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="G F+ A; D F- H; ...")
     st.markdown('</div>', unsafe_allow_html=True)
     protokol_verileri.append({"yanit": yanit, "anket": anket, "kodlar": kodlar})
 
 # --- 4. BÖLÜM: ANALİZ VE WORD ÇIKTISI ---
-if st.button("Analizi Gerçekleştir ve Raporu İndir"):
+if st.button("Analizi Gerçekleştir ve Raporu Hazırla"):
     total_r = 0
     r_8910 = 0
     all_codes = []
@@ -99,21 +105,34 @@ if st.button("Analizi Gerçekleştir ve Raporu İndir"):
 
     if total_r > 0:
         counts = Counter(all_codes)
+        
+        # Oran Hesaplamaları
         calc = {
-            "%G": (counts["G"]/total_r)*100 if total_r > 0 else 0,
-            "%D": (counts["D"]/total_r)*100 if total_r > 0 else 0,
-            "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100 if total_r > 0 else 0,
-            "%A": ((counts["A"]+counts["Ad"])/total_r)*100 if total_r > 0 else 0,
-            "%H": ((counts["H"]+counts["Hd"])/total_r)*100 if total_r > 0 else 0,
-            "RC": (r_8910/total_r)*100 if total_r > 0 else 0
+            "%G": (counts["G"]/total_r)*100,
+            "%D": (counts["D"]/total_r)*100,
+            "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100,
+            "%A": ((counts["A"]+counts["Ad"])/total_r)*100,
+            "%H": ((counts["H"]+counts["Hd"])/total_r)*100,
+            "RC": (r_8910/total_r)*100
         }
         p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + \
                 (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + \
                 (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
         calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
 
-        # Ekrandaki Analiz Özeti
+        # EKRAN: Analiz Özeti ve Grup Frekansları
         st.subheader(f"Analiz Özeti (R: {total_r})")
+        
+        # Kod Sayıları (Frekanslar)
+        st.write("**Kod Frekans Dağılımı:**")
+        freq_cols = st.columns(4)
+        for idx, group in enumerate([GRUP_1, GRUP_2, GRUP_3, YAN_DAL]):
+            with freq_cols[idx]:
+                for k in group:
+                    if counts[k] > 0:
+                        st.write(f"- **{k}:** {counts[k]}")
+
+        # Renkli Metrik Kutuları
         res_cols = st.columns(4)
         res_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
         res_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -125,14 +144,13 @@ if st.button("Analizi Gerçekleştir ve Raporu İndir"):
             doc = Document()
             doc.add_heading('Rorschach Klinik Analiz Raporu', 0)
             
-            # 1. Hasta Bilgileri ve Yorumlar
+            # 1. Hasta Bilgileri
             doc.add_heading('1. Hasta Bilgileri ve Klinik Gözlem', level=1)
             p = doc.add_paragraph()
             p.add_run(f'Ad Soyad: ').bold = True
             p.add_run(f'{h_isim}\n')
             p.add_run(f'Yaş: ').bold = True
             p.add_run(f'{h_yas}\n')
-            
             doc.add_heading('Klinik Yorumlar:', level=2)
             doc.add_paragraph(h_yorum if h_yorum else "Yorum girilmedi.")
             
@@ -147,19 +165,26 @@ if st.button("Analizi Gerçekleştir ve Raporu İndir"):
                 doc.add_heading(f'Kart {i}', level=2)
                 table = doc.add_table(rows=2, cols=3)
                 table.style = 'Table Grid'
-                # Tablo Başlıkları
                 table.rows[0].cells[0].text = 'Yanıt'
                 table.rows[0].cells[1].text = 'Anket'
                 table.rows[0].cells[2].text = 'Kodlar'
-                # Tablo İçeriği
                 table.rows[1].cells[0].text = p_data["yanit"]
                 table.rows[1].cells[1].text = p_data["anket"]
                 table.rows[1].cells[2].text = p_data["kodlar"]
 
-            # 4. Psikogram Analiz Sonuçları
-            doc.add_heading('4. Psikogram Analiz Sonuçları', level=1)
-            doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+            # 4. Psikogram Verileri (FREKANSLAR BURAYA EKLENDİ)
+            doc.add_heading('4. Psikogram Analiz Verileri', level=1)
+            doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}").bold = True
             
+            doc.add_heading('Kod Frekansları:', level=2)
+            f_table = doc.add_table(rows=1, cols=2)
+            f_table.style = 'Table Grid'
+            for k, v in counts.items():
+                row = f_table.add_row().cells
+                row[0].text = str(k)
+                row[1].text = str(v)
+
+            doc.add_heading('Hesaplanan Oranlar:', level=2)
             res_table = doc.add_table(rows=1, cols=2)
             res_table.style = 'Table Grid'
             for k, v in calc.items():
@@ -169,7 +194,6 @@ if st.button("Analizi Gerçekleştir ve Raporu İndir"):
 
             doc.add_paragraph(f"\nHazırlayan: Kerem Birgül")
 
-            # Dosyayı Hazırla
             bio = BytesIO()
             doc.save(bio)
             st.download_button(
@@ -179,4 +203,8 @@ if st.button("Analizi Gerçekleştir ve Raporu İndir"):
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
         except Exception as e:
-            st.error(f"Rapor oluşturulurken bir hata oluştu: {e}")
+            st.error(f"Hata: {e}")
+    else:
+        st.warning("Henüz kod girilmedi.")
+
+st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
