@@ -1,48 +1,62 @@
 import streamlit as st
 
-# Sayfa Başlığı ve Tasarımı
-st.set_page_config(page_title="Kod Analiz Sistemi", layout="centered")
-st.title("📊 Kart ve Kod Analiz Paneli")
+st.set_page_config(page_title="Kart Analiz Sistemi", layout="wide")
 
-# 1. KISIM: Veri Girişi
-st.subheader("Giriş Bilgileri")
-kart_no = st.text_input("Kart Numarası")
-kodlar = st.text_area("Kodları buraya yapıştırın (Aralarına boşluk bırakarak)")
-l14_degeri = st.number_input("L14 Değeri (Toplam Puan Bölünecek Sayı)", min_value=0.0, value=7.0)
+st.title("📋 10 Kartlı Kod Analiz Sistemi")
+st.write("Her kart için kodları ilgili kutucuğa yapıştırın. 'Reddetme' içeren kodlar otomatik elenecektir.")
 
-# 2. KISIM: Hesaplama Mantığı
-if st.button("Analiz Et ve Hesapla"):
-    if kodlar:
-        # Kodları listeye çevir ve "Reddetme" olanları ele
-        kelime_listesi = [k.strip() for k in kodlar.split() if "Reddetme" not in k]
-        toplam_kod_sayisi = len(kelime_listesi)
-        
-        # Puanlama Grupları (Senin mantığına göre)
-        # Örnek: L5, L6, L7 grubu kodları burada tanımlanabilir
-        grup_05 = ["FC", "FC'", "Fclob"]
-        grup_10 = ["CF", "C'F", "ClobF"]
-        grup_15 = ["C", "C'", "Clob"]
-        
-        puan_05 = sum(1 for k in kelime_listesi if k in grup_05) * 0.5
-        puan_10 = sum(1 for k in kelime_listesi if k in grup_10) * 1.0
-        puan_15 = sum(1 for k in kelime_listesi if k in grup_15) * 1.5
-        
-        toplam_puan = puan_05 + puan_10 + puan_15
-        
-        # Sonuç Hesaplama (L14 / Toplam Puan)
-        try:
-            oran = (l14_degeri / toplam_puan) * 100 if toplam_puan > 0 else 0
-        except ZeroDivisionError:
-            oran = 0
+# Puanlama Katsayıları (Daha sonra değiştirmek istersen buradan kolayca yapabilirsin)
+GRUP_05 = ["FC", "FC'", "Fclob"]
+GRUP_10 = ["CF", "C'F", "ClobF"]
+GRUP_15 = ["C", "C'", "Clob"]
 
-        # 3. KISIM: Sonuçları Göster
-        st.divider()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Geçerli Kod Sayısı", toplam_kod_sayisi)
-        col2.metric("Hesaplanan Puan", toplam_puan)
-        col3.metric("Sonuç Oranı", f"%{oran:.0f}")
+# Verileri depolamak için bir liste
+kart_verileri = []
+
+# 10 Adet Kart Girişi Oluşturma
+cols = st.columns(2) # Sayfayı iki sütuna bölüyoruz ki çok uzun görünmesin
+for i in range(1, 11):
+    with cols[0] if i <= 5 else cols[1]:
+        input_id = f"Kart {i}"
+        kod_girisi = st.text_area(f"📍 {input_id} Kodlarını Girin:", key=f"kart_{i}", height=100)
+        kart_verileri.append(kod_girisi)
+
+st.divider()
+
+# Global Ayarlar (L14 Değeri)
+l14_degeri = st.number_input("🎯 Analiz için L14 Değerini Girin:", value=7.0)
+
+if st.button("🚀 Tüm Kartları Analiz Et ve Hesapla"):
+    toplam_genel_puan = 0
+    toplam_gecerli_kod = 0
+    
+    # Her kartı tek tek dönerek hesapla
+    for idx, ham_veri in enumerate(kart_verileri, 1):
+        if ham_veri:
+            # Kodları ayır ve Reddetme içerenleri ele
+            kodlar = [k.strip() for k in ham_veri.split() if "Reddetme" not in k]
+            
+            # Bu kartın puanını hesapla
+            p05 = sum(1 for k in kodlar if k in GRUP_05) * 0.5
+            p10 = sum(1 for k in kodlar if k in GRUP_10) * 1.0
+            p15 = sum(1 for k in kodlar if k in GRUP_15) * 1.5
+            
+            kart_puani = p05 + p10 + p15
+            toplam_genel_puan += kart_puani
+            toplam_gecerli_kod += len(kodlar)
+            
+            # Kart bazlı küçük bilgi (isteğe bağlı)
+            # st.write(f"Kart {idx}: {kart_puani} puan")
+
+    # Genel Sonuç Hesaplama
+    if toplam_genel_puan > 0:
+        genel_oran = (l14_degeri / toplam_genel_puan) * 100
         
-        if oran > 100:
-            st.warning("⚠️ Oran %100'ün üzerinde çıktı!")
+        # Sonuç Ekranı
+        st.success("✅ Tüm kartlar başarıyla analiz edildi.")
+        res_col1, res_col2, res_col3 = st.columns(3)
+        res_col1.metric("Toplam Geçerli Kod", toplam_gecerli_kod)
+        res_col2.metric("Toplam Hesaplanan Puan", f"{toplam_genel_puan}")
+        res_col3.metric("GENEL SONUÇ ORANI", f"%{genel_oran:.0f}")
     else:
-        st.error("Lütfen kodları giriniz!")
+        st.warning("Hesaplanacak veri bulunamadı. Lütfen kartlara kod girişi yapın.")
