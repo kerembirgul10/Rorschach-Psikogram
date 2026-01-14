@@ -54,7 +54,7 @@ if 'logged_in' not in st.session_state:
 if 'user' not in st.session_state:
     st.session_state['user'] = ""
 
-# --- 4. GİRİŞ VE KAYIT SAYFASI ---
+# --- 4. GİRİŞ VE KAYIT SAYFASI (GÜNCEL) ---
 def auth_page():
     st.title("🧠 Rorschach Klinik Analiz")
     tab1, tab2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
@@ -63,30 +63,42 @@ def auth_page():
         login_user = st.text_input("Kullanıcı Adı", key="l_user")
         login_pw = st.text_input("Şifre", type="password", key="l_pw")
         if st.button("Giriş Yap"):
-            users_df = pd.DataFrame(user_sheet.get_all_records())
-            if not users_df.empty and login_user in users_df['kullanici_adi'].values:
-                correct_pw = users_df[users_df['kullanici_adi'] == login_user]['sifre'].values[0]
-                if str(login_pw) == str(correct_pw):
-                    st.session_state['logged_in'] = True
-                    st.session_state['user'] = login_user
-                    st.rerun()
+            data = user_sheet.get_all_records()
+            if data:
+                users_df = pd.DataFrame(data)
+                # Sütun isimlerindeki olası boşlukları temizleyelim
+                users_df.columns = users_df.columns.str.strip()
+                
+                if login_user in users_df['kullanici_adi'].values:
+                    user_row = users_df[users_df['kullanici_adi'] == login_user]
+                    correct_pw = str(user_row['sifre'].values[0])
+                    if str(login_pw) == correct_pw:
+                        st.session_state['logged_in'] = True
+                        st.session_state['user'] = login_user
+                        st.rerun()
+                    else:
+                        st.error("Hatalı şifre.")
                 else:
-                    st.error("Hatalı şifre.")
+                    st.error("Kullanıcı bulunamadı.")
             else:
-                st.error("Kullanıcı bulunamadı.")
+                st.error("Veritabanı boş. Önce kayıt olun.")
 
     with tab2:
         new_user = st.text_input("Yeni Kullanıcı Adı", key="r_user")
         new_pw = st.text_input("Yeni Şifre", type="password", key="r_pw")
         new_name = st.text_input("Adınız Soyadınız", key="r_name")
         if st.button("Kayıt Ol"):
-            users_df = pd.DataFrame(user_sheet.get_all_records())
-            if new_user in users_df['kullanici_adi'].values:
+            data = user_sheet.get_all_records()
+            users_df = pd.DataFrame(data) if data else pd.DataFrame(columns=['kullanici_adi', 'sifre', 'isim'])
+            users_df.columns = users_df.columns.str.strip()
+            
+            if not users_df.empty and new_user in users_df['kullanici_adi'].values:
                 st.warning("Bu kullanıcı adı zaten alınmış.")
+            elif not new_user or not new_pw:
+                st.error("Kullanıcı adı ve şifre boş bırakılamaz.")
             else:
-                user_sheet.append_row([new_user, new_pw, new_name])
+                user_sheet.append_row([new_user, str(new_pw), new_name])
                 st.success("Kaydınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.")
-
 # --- 5. ANA PANEL (DASHBOARD) ---
 def dashboard():
     st.sidebar.title(f"Hoş geldin, {st.session_state['user']}")
