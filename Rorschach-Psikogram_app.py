@@ -85,11 +85,11 @@ if st.button("🚀 Analiz"):
         # 3. BÖLÜM: PSİKOGRAM HESAPLAMALARI (EN ALTTA)
         st.subheader("🔍 Psikogram Hesaplamaları")
         
-        # Değerleri hazırla
+        # Değerleri hazırla (Parantezli kodlar dahil edildi)
         g_say = kod_sayilari["G"]
         d_say = kod_sayilari["D"]
-        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"]
-        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"]
+        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"] + kod_sayilari["(A)"]
+        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"] + kod_sayilari["(H)"]
         
         # Hesaplamalar
         g_yuzde = (g_say / toplam_r_sayisi) * 100
@@ -109,3 +109,4 @@ if st.button("🚀 Analiz"):
                     
     else:
         st.error("Giriş yapılmadı.")
+    
