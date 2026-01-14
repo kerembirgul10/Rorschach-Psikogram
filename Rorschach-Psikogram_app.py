@@ -27,9 +27,10 @@ for i in range(1, 11):
 
 if st.button("🚀 Analiz"):
     toplam_r_sayisi = 0
+    kart_8910_r_sayisi = 0
     tum_kodlar = []
     
-    for ham_veri in kart_verileri:
+    for i, ham_veri in enumerate(kart_verileri, 1):
         if ham_veri.strip():
             satirlar = ham_veri.strip().split('\n')
             for satir in satirlar:
@@ -37,38 +38,31 @@ if st.button("🚀 Analiz"):
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
+                # R Sayımı
                 toplam_r_sayisi += 1
+                
+                # 8, 9 ve 10. kartların yanıtlarını ayrıca say (R.C. için)
+                if i in [8, 9, 10]:
+                    kart_8910_r_sayisi += 1
+                
+                # Kodları ayıkla
                 kelimeler = temiz_satir.replace(",", " ").split()
                 for k in kelimeler:
                     if k != "":
                         tum_kodlar.append(k)
 
     if toplam_r_sayisi > 0:
-        # Kodları say
-        kod_sayilari = Counter(tum_kodlar)
-        
-        # --- HESAPLAMALAR (%G ve %D) ---
-        g_sayisi = kod_sayilari["G"]
-        d_sayisi = kod_sayilari["D"]
-        
-        g_orani = (g_sayisi / toplam_r_sayisi) * 100
-        d_orani = (d_sayisi / toplam_r_sayisi) * 100
-
-        # Üst Bilgi Satırı
+        # 1. BÖLÜM: R SAYISI
         st.subheader(f"R:{toplam_r_sayisi}")
-        
-        # Oranları Yan Yana Göster
-        col_g, col_d = st.columns(2)
-        col_g.metric("%G", f"%{g_orani:.0f}")
-        col_d.metric("%D", f"%{d_orani:.0f}")
-        
         st.divider()
 
-        # --- KODLARI YATAY GRUPLAR HALİNDE GÖSTER ---
+        # 2. BÖLÜM: KOD DAĞILIMI
+        kod_sayilari = Counter(tum_kodlar)
+        
         def grubu_yazdir(liste):
             bulunanlar = [k for k in liste if kod_sayilari[k] > 0]
             if bulunanlar:
-                render_cols = st.columns(len(bulunanlar) if len(bulunanlar) > 0 else 1)
+                render_cols = st.columns(len(bulunanlar))
                 for idx, k in enumerate(bulunanlar):
                     render_cols[idx].write(f"**{k}:** {kod_sayilari[k]}")
                 st.write("") 
@@ -78,15 +72,40 @@ if st.button("🚀 Analiz"):
         grubu_yazdir(GRUP_3)
         grubu_yazdir(YAN_DAL)
 
-        st.divider()
-
-        # --- İSTİSNALAR (Tek Bir Kutu İçinde) ---
+        # İSTİSNALAR (Tek Kutu)
         istisnalar = [k for k in kod_sayilari if k not in HEPSI_TANIMLI]
         if istisnalar:
             istisna_metni = ""
             for k in istisnalar:
                 istisna_metni += f"**{k}:** {kod_sayilari[k]} &nbsp;&nbsp;&nbsp; "
             st.info(istisna_metni)
+
+        st.divider()
+
+        # 3. BÖLÜM: PSİKOGRAM HESAPLAMALARI (EN ALTTA)
+        st.subheader("🔍 Psikogram Hesaplamaları")
+        
+        # Değerleri hazırla
+        g_say = kod_sayilari["G"]
+        d_say = kod_sayilari["D"]
+        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"]
+        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"]
+        
+        # Hesaplamalar
+        g_yuzde = (g_say / toplam_r_sayisi) * 100
+        d_yuzde = (d_say / toplam_r_sayisi) * 100
+        rc_yuzde = (kart_8910_r_sayisi / toplam_r_sayisi) * 100
+        a_yuzde = (a_toplam / toplam_r_sayisi) * 100
+        h_yuzde = (h_toplam / toplam_r_sayisi) * 100
+
+        # Metrikleri Göster
+        calc_col1, calc_col2, calc_col3, calc_col4, calc_col5 = st.columns(5)
+        
+        calc_col1.metric("%G", f"%{g_yuzde:.0f}")
+        calc_col2.metric("%D", f"%{d_yuzde:.0f}")
+        calc_col3.metric("R.C.", f"%{rc_yuzde:.0f}")
+        calc_col4.metric("%A", f"%{a_yuzde:.0f}")
+        calc_col5.metric("%H", f"%{h_yuzde:.0f}")
                     
     else:
         st.error("Giriş yapılmadı.")
