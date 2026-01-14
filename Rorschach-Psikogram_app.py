@@ -14,20 +14,28 @@ except ImportError:
     pass
 
 # --- 1. GOOGLE SHEETS BAĞLANTISI ---
-# Streamlit Secrets'tan anahtarı çekiyoruz
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Secrets içine yapıştırdığın JSON içeriğini yüklüyoruz
     creds_info = json.loads(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_info, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Kendi Google Sheet adını buraya tam olarak yaz (Örn: Rorschach_Veritabani)
-    sheet = client.open("Rorschach_Veritabani")
+    # DOSYA ADINI BURADAN KONTROL ET
+    SHEET_NAME = "Rorschach_Veritabani" 
+    sheet = client.open(SHEET_NAME)
+    
+    # SEKME İSİMLERİNİ BURADAN KONTROL ET
     user_sheet = sheet.worksheet("Kullanıcılar")
     patient_sheet = sheet.worksheet("Hastalar")
+    
+except gspread.exceptions.SpreadsheetNotFound:
+    st.error(f"Hata: '{SHEET_NAME}' isimli bir Google Sheet dosyası bulunamadı.")
+    st.stop()
+except gspread.exceptions.WorksheetNotFound as e:
+    st.error(f"Hata: Dosya bulundu ama '{e}' isimli sekme (sayfa) bulunamadı. Lütfen sekme ismini kontrol edin.")
+    st.stop()
 except Exception as e:
-    st.error(f"Veritabanı bağlantı hatası: {e}")
+    st.error(f"Beklenmedik Bağlantı Hatası: {e}")
     st.stop()
 
 # --- 2. TASARIM AYARLARI ---
