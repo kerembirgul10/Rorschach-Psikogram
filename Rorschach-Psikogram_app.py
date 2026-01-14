@@ -1,14 +1,8 @@
 import streamlit as st
 from collections import Counter
 from io import BytesIO
-
-# Kütüphaneyi en güvenli şekilde çağıralım
-try:
-    import docx
-    from docx import Document
-    WORD_READY = True
-except Exception:
-    WORD_READY = False
+import docx
+from docx import Document
 
 st.set_page_config(page_title="Rorschach Psikogram", layout="wide")
 
@@ -93,18 +87,17 @@ if st.button("Analizi Tamamla"):
         with col_4: st.markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
         # Word İndirme
-        if WORD_READY:
-            try:
-                doc = Document()
-                doc.add_heading('Rorschach Psikogram Analizi', 0)
-                doc.add_paragraph(f'R: {total_r}')
-                bio = BytesIO()
-                doc.save(bio)
-                st.download_button(label="📄 Word Olarak İndir", data=bio.getvalue(), file_name="Psikogram_Raporu.docx")
-            except Exception:
-                st.warning("Dosya hazırlanırken bir hata oluştu.")
-        else:
-            st.error("Sistem bileşenleri yükleniyor, lütfen sayfayı yenileyin.")
+        doc = Document()
+        doc.add_heading('Rorschach Psikogram Raporu', 0)
+        doc.add_paragraph(f'Toplam Yanıt (R): {total_r}')
+        doc.add_heading('Psikogram Oranları', level=1)
+        for name, val in calc.items():
+            doc.add_paragraph(f'{name}: %{val:.0f}')
+        doc.add_paragraph('\nHazırlayan: Kerem Birgül')
+        bio = BytesIO()
+        doc.save(bio)
+        
+        st.download_button(label="📄 Word Olarak İndir", data=bio.getvalue(), file_name="Rorschach_Raporu.docx")
 
     else:
         st.warning("Veri girişi yapılmadı.")
