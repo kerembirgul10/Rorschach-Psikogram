@@ -45,4 +45,30 @@ if st.button("🚀 Analiz Et"):
     if toplam_r_sayisi > 0:
         # --- HESAPLAMA MANTIĞI ---
         p05 = sum(1 for k in tum_gecerli_kodlar if k in ["FC", "Fc'", "Fclob"]) * 0.5
-        p10 = sum
+        p10 = sum(1 for k in tum_gecerli_kodlar if k in ["CF", "C'F", "ClobF"]) * 1.0
+        p15 = sum(1 for k in tum_gecerli_kodlar if k in ["C", "C'", "Clob"]) * 1.5
+        
+        toplam_puan = p05 + p10 + p15
+        
+        # --- ÖZET SONUÇLAR (R ve ORAN) ---
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Toplam Yanıt", f"{toplam_r_sayisi} (R)")
+        col2.metric("Hesaplanan Puan", toplam_puan)
+        
+        if toplam_puan > 0:
+            oran = (l14_degeri / toplam_puan) * 100
+            col3.metric("Sonuç Oranı", f"%{oran:.0f}")
+
+        st.divider()
+
+        # --- TEKİL KOD LİSTESİ ---
+        st.subheader("🔍 Kod Dağılımı")
+        kod_sayilari = Counter(tum_gecerli_kodlar)
+        
+        detay_cols = st.columns(4)
+        for idx, (kod, adet) in enumerate(kod_sayilari.items()):
+            with detay_cols[idx % 4]:
+                st.write(f"**{kod}:** {adet} adet")
+                
+    else:
+        st.error("Lütfen hesaplama için yanıt girişi yapın.")
