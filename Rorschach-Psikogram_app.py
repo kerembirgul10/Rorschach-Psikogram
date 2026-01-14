@@ -38,14 +38,11 @@ if st.button("🚀 Analiz"):
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
-                # R Sayımı
                 toplam_r_sayisi += 1
                 
-                # 8, 9 ve 10. kartların yanıtlarını ayrıca say (R.C. için)
                 if i in [8, 9, 10]:
                     kart_8910_r_sayisi += 1
                 
-                # Kodları ayıkla
                 kelimeler = temiz_satir.replace(",", " ").split()
                 for k in kelimeler:
                     if k != "":
@@ -72,7 +69,6 @@ if st.button("🚀 Analiz"):
         grubu_yazdir(GRUP_3)
         grubu_yazdir(YAN_DAL)
 
-        # İSTİSNALAR (Tek Kutu)
         istisnalar = [k for k in kod_sayilari if k not in HEPSI_TANIMLI]
         if istisnalar:
             istisna_metni = ""
@@ -82,31 +78,44 @@ if st.button("🚀 Analiz"):
 
         st.divider()
 
-        # 3. BÖLÜM: PSİKOGRAM HESAPLAMALARI (EN ALTTA)
+        # 3. BÖLÜM: PSİKOGRAM HESAPLAMALARI
         st.subheader("🔍 Psikogram Hesaplamaları")
         
-        # Değerleri hazırla (Parantezli kodlar dahil edildi)
+        # Değerleri hazırla
         g_say = kod_sayilari["G"]
         d_say = kod_sayilari["D"]
-        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"] + kod_sayilari["(A)"]
-        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"] + kod_sayilari["(H)"]
+        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"]
+        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"]
+        f_toplam = kod_sayilari["F"] + kod_sayilari["F+"] + kod_sayilari["F-"] + kod_sayilari["F+-"]
         
-        # Hesaplamalar
+        # T.R.I. Puanlama Mantığı
+        puan_05 = (kod_sayilari["FC"] + kod_sayilari["FC'"] + kod_sayilari["Fclob"]) * 0.5
+        puan_10 = (kod_sayilari["CF"] + kod_sayilari["C'F"] + kod_sayilari["ClobF"]) * 1.0
+        puan_15 = (kod_sayilari["C"] + kod_sayilari["C'"] + kod_sayilari["Clob"]) * 1.5
+        toplam_tri_puani = puan_05 + puan_10 + puan_15
+        
+        k_sayisi = kod_sayilari["K"]
+        
+        # Yüzde Hesaplamaları
         g_yuzde = (g_say / toplam_r_sayisi) * 100
         d_yuzde = (d_say / toplam_r_sayisi) * 100
         rc_yuzde = (kart_8910_r_sayisi / toplam_r_sayisi) * 100
         a_yuzde = (a_toplam / toplam_r_sayisi) * 100
         h_yuzde = (h_toplam / toplam_r_sayisi) * 100
+        f_yuzde = (f_toplam / toplam_r_sayisi) * 100
+        
+        # T.R.I. Hesaplama (Bölme hatasını önlemek için kontrol ekledik)
+        tri_sonuc = (k_sayisi / toplam_tri_puani) * 100 if toplam_tri_puani > 0 else 0
 
         # Metrikleri Göster
-        calc_col1, calc_col2, calc_col3, calc_col4, calc_col5 = st.columns(5)
-        
-        calc_col1.metric("%G", f"%{g_yuzde:.0f}")
-        calc_col2.metric("%D", f"%{d_yuzde:.0f}")
-        calc_col3.metric("R.C.", f"%{rc_yuzde:.0f}")
-        calc_col4.metric("%A", f"%{a_yuzde:.0f}")
-        calc_col5.metric("%H", f"%{h_yuzde:.0f}")
+        calc_cols = st.columns(7)
+        calc_cols[0].metric("%G", f"%{g_yuzde:.0f}")
+        calc_cols[1].metric("%D", f"%{d_yuzde:.0f}")
+        calc_cols[2].metric("R.C.", f"%{rc_yuzde:.0f}")
+        calc_cols[3].metric("%A", f"%{a_yuzde:.0f}")
+        calc_cols[4].metric("%H", f"%{h_yuzde:.0f}")
+        calc_cols[5].metric("%F", f"%{f_yuzde:.0f}")
+        calc_cols[6].metric("T.R.I.", f"%{tri_sonuc:.0f}")
                     
     else:
         st.error("Giriş yapılmadı.")
-    
