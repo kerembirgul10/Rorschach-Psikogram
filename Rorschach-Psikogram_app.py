@@ -54,7 +54,7 @@ if st.button("🚀 Kodları Analiz Et"):
         # --- 1. KISIM: İSTİSNALAR (Renkli Kutu) ---
         istisnalar = [k for k in kod_sayilari if k not in hepsi_tanimli]
         if istisnalar:
-            istisna_metni = "⚠️ **Tanımsız Kodlar (İstisnalar):** \n"
+            istisna_metni = "\n"
             for k in istisnalar:
                 istisna_metni += f"{k}: {kod_sayilari[k]}  \n"
             st.info(istisna_metni)
