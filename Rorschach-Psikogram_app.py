@@ -5,17 +5,18 @@ st.set_page_config(page_title="Kod Analiz Sistemi", layout="centered")
 
 st.title("📊 Kart Kod Analiz Paneli")
 
-# --- TANIMLI LİSTELER (Sıralama için) ---
-KOD_LISTESI = [
-    # Grup 1 Kodları
+# --- TANIMLI LİSTELER ---
+ANA_VE_YAN_LISTE = [
+    # Grup 1
     "G", "D", "Dd", "Gbl", "Dbl",
-    # Grup 2 Kodları
+    # Grup 2
     "F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", 
     "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE",
-    # Grup 3 Kodları
-    "H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"
+    # Grup 3
+    "H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa",
+    # Yan Dallar
+    "Ban", "Reddetme", "Şok"
 ]
-YAN_DAL_LISTESI = ["Ban", "Reddetme", "Şok"]
 
 # --- GİRİŞ ALANLARI ---
 st.subheader("Kart Yanıtlarını Girin")
@@ -34,7 +35,7 @@ if st.button("🚀 Kodları Analiz Et"):
             satirlar = ham_veri.strip().split('\n')
             for satir in satirlar:
                 temiz_satir = satir.strip()
-                # Sadece "Reddetme" yazan yanıtı R olarak kabul etme
+                # "Reddetme" yanıtını R olarak sayma
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
@@ -49,32 +50,20 @@ if st.button("🚀 Kodları Analiz Et"):
         st.divider()
 
         kod_sayilari = Counter(tum_kodlar)
-        hepsi_tanimli = set(KOD_LISTESI + YAN_DAL_LISTESI)
         
-        # --- 1. KISIM: İSTİSNALAR (Renkli Kutu) ---
-        istisnalar = [k for k in kod_sayilari if k not in hepsi_tanimli]
-        if istisnalar:
-            istisna_metni = "\n"
-            for k in istisnalar:
-                istisna_metni += f"{k}: {kod_sayilari[k]}  \n"
-            st.info(istisna_metni)
-
-        # --- 2. KISIM: ANA KODLAR VE YAN DALLAR ---
-        # Kodları dikeyde güzel göstermek için sütun kullanalım ama başlık yazmayalım
-        col1, col2 = st.columns(2)
+        # --- SIRALI LİSTELEME ---
+        # Önce listede olanları senin sıranla yazdır
+        for k in ANA_VE_YAN_LISTE:
+            if kod_sayilari[k] > 0:
+                st.write(f"**{k}:** {kod_sayilari[k]}")
         
-        with col1:
-            # Ana listedeki kodları sırayla yazdır
-            for k in KOD_LISTESI:
-                if kod_sayilari[k] > 0:
-                    st.write(f"**{k}:** {kod_sayilari[k]}")
+        # --- İSTİSNALARI RENKLİ KUTUDA SIRALA ---
+        # Listede olmayan ama girişi yapılan kodları bul
+        tanimsizlar = [k for k in kod_sayilari if k not in ANA_VE_YAN_LISTE]
         
-        with col2:
-            # Yan dal kodlarını listenin en altına gelecek şekilde yazdır
-            for k in YAN_DAL_LISTESI:
-                if kod_sayilari[k] > 0:
-                    st.write(f"**{k}:** {kod_sayilari[k]}")
+        for k in tanimsizlar:
+            # Grup ismi yazmadan sadece pastel renkli kutu içinde kod ve sayısı
+            st.info(f"**{k}:** {kod_sayilari[k]}")
                     
     else:
         st.error("Lütfen analiz için geçerli bir yanıt girin.")
-        
