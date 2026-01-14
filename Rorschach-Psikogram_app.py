@@ -1,45 +1,59 @@
 import streamlit as st
 from collections import Counter
 
+# Sayfa yapılandırması
 st.set_page_config(page_title="Rorschach Psikogram", layout="wide")
 
-# Başlık
-st.title("📊 Rorschach Psikogram")
+# Kutuların boyutunu sabitleyen CSS
+st.markdown("""
+    <style>
+    textarea {
+        resize: none !important;
+    }
+    .stMetric {
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    /* Pastel Renk Grupları */
+    .sari-kutu { background-color: #fff9c4; padding: 20px; border-radius: 10px; border: 1px solid #fbc02d; margin-bottom: 10px; }
+    .kirmizi-kutu { background-color: #ffecb3; padding: 20px; border-radius: 10px; border: 1px solid #ffa000; margin-bottom: 10px; }
+    .mor-kutu { background-color: #f3e5f5; padding: 20px; border-radius: 10px; border: 1px solid #9c27b0; margin-bottom: 10px; }
+    .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #bdc3c7; font-size: 12px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("Rorschach Psikogram")
 
 # --- GRUP TANIMLAMALARI ---
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
-GRUP_2 = [
-    "F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", 
-    "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"
-]
+GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
 YAN_DAL = ["Ban", "Reddetme", "Şok"]
-
 HEPSI_TANIMLI = set(GRUP_1 + GRUP_2 + GRUP_3 + YAN_DAL)
 
-# --- GİRİŞ ALANLARI ---
-st.subheader("Kartlar")
-kart_verileri = []
+st.info("Yanıtları birbirinden ayırmak için her yanıtın sonuna noktalı virgül (;) koyun. Örn: G F+ H; D F- A")
 
+kart_verileri = []
 for i in range(1, 11):
-    kod_girisi = st.text_area(f"Kart {i}", key=f"kart_{i}", height=80)
+    kod_girisi = st.text_area(f"Kart {i}", key=f"kart_{i}", height=100)
     kart_verileri.append(kod_girisi)
 
-if st.button("🚀 Analiz"):
+if st.button("Analiz"):
     toplam_r_sayisi = 0
     kart_8910_r_sayisi = 0
     tum_kodlar = []
     
     for i, ham_veri in enumerate(kart_verileri, 1):
         if ham_veri.strip():
-            satirlar = ham_veri.strip().split('\n')
+            # Yanıtları noktalı virgül veya yeni satıra göre ayır
+            satirlar = ham_veri.replace(';', '\n').split('\n')
             for satir in satirlar:
                 temiz_satir = satir.strip()
                 if temiz_satir == "" or temiz_satir.lower() == "reddetme":
                     continue
                 
                 toplam_r_sayisi += 1
-                
                 if i in [8, 9, 10]:
                     kart_8910_r_sayisi += 1
                 
@@ -49,20 +63,18 @@ if st.button("🚀 Analiz"):
                         tum_kodlar.append(k)
 
     if toplam_r_sayisi > 0:
-        # 1. BÖLÜM: R SAYISI
         st.subheader(f"R:{toplam_r_sayisi}")
         st.divider()
 
-        # 2. BÖLÜM: KOD DAĞILIMI
         kod_sayilari = Counter(tum_kodlar)
         
+        # Kod Dağılımı Gösterimi
         def grubu_yazdir(liste):
             bulunanlar = [k for k in liste if kod_sayilari[k] > 0]
             if bulunanlar:
-                render_cols = st.columns(len(bulunanlar))
+                render_cols = st.columns(max(len(bulunanlar), 1))
                 for idx, k in enumerate(bulunanlar):
                     render_cols[idx].write(f"**{k}:** {kod_sayilari[k]}")
-                st.write("") 
 
         grubu_yazdir(GRUP_1)
         grubu_yazdir(GRUP_2)
@@ -71,51 +83,42 @@ if st.button("🚀 Analiz"):
 
         istisnalar = [k for k in kod_sayilari if k not in HEPSI_TANIMLI]
         if istisnalar:
-            istisna_metni = ""
-            for k in istisnalar:
-                istisna_metni += f"**{k}:** {kod_sayilari[k]} &nbsp;&nbsp;&nbsp; "
+            istisna_metni = " ".join([f"**{k}:** {kod_sayilari[k]} | " for k in istisnalar])
             st.info(istisna_metni)
 
         st.divider()
 
-        # 3. BÖLÜM: PSİKOGRAM HESAPLAMALARI
-        st.subheader("🔍 Psikogram Hesaplamaları")
-        
-        # Değerleri hazırla
-        g_say = kod_sayilari["G"]
-        d_say = kod_sayilari["D"]
-        a_toplam = kod_sayilari["A"] + kod_sayilari["Ad"]
-        h_toplam = kod_sayilari["H"] + kod_sayilari["Hd"]
-        f_toplam = kod_sayilari["F"] + kod_sayilari["F+"] + kod_sayilari["F-"] + kod_sayilari["F+-"]
-        
-        # T.R.I. Puanlama Mantığı
-        puan_05 = (kod_sayilari["FC"] + kod_sayilari["FC'"] + kod_sayilari["Fclob"]) * 0.5
-        puan_10 = (kod_sayilari["CF"] + kod_sayilari["C'F"] + kod_sayilari["ClobF"]) * 1.0
-        puan_15 = (kod_sayilari["C"] + kod_sayilari["C'"] + kod_sayilari["Clob"]) * 1.5
-        toplam_tri_puani = puan_05 + puan_10 + puan_15
-        
-        k_sayisi = kod_sayilari["K"]
-        
-        # Yüzde Hesaplamaları
-        g_yuzde = (g_say / toplam_r_sayisi) * 100
-        d_yuzde = (d_say / toplam_r_sayisi) * 100
+        # --- HESAPLAMALAR VE RENKLİ KUTULAR ---
+        # Veri Hazırlama
+        g_yuzde = (kod_sayilari["G"] / toplam_r_sayisi) * 100
+        d_yuzde = (kod_sayilari["D"] / toplam_r_sayisi) * 100
+        f_yuzde = (sum(kod_sayilari[k] for k in ["F", "F+", "F-", "F+-"]) / toplam_r_sayisi) * 100
+        a_yuzde = ((kod_sayilari["A"] + kod_sayilari["Ad"]) / toplam_r_sayisi) * 100
+        h_yuzde = ((kod_sayilari["H"] + kod_sayilari["Hd"]) / toplam_r_sayisi) * 100
         rc_yuzde = (kart_8910_r_sayisi / toplam_r_sayisi) * 100
-        a_yuzde = (a_toplam / toplam_r_sayisi) * 100
-        h_yuzde = (h_toplam / toplam_r_sayisi) * 100
-        f_yuzde = (f_toplam / toplam_r_sayisi) * 100
         
-        # T.R.I. Hesaplama (Bölme hatasını önlemek için kontrol ekledik)
-        tri_sonuc = (k_sayisi / toplam_tri_puani) * 100 if toplam_tri_puani > 0 else 0
+        puan_tri = (kod_sayilari["FC"]+kod_sayilari["FC'"]+kod_sayilari["Fclob"])*0.5 + \
+                   (kod_sayilari["CF"]+kod_sayilari["C'F"]+kod_sayilari["ClobF"])*1.0 + \
+                   (kod_sayilari["C"]+kod_sayilari["C'"]+kod_sayilari["Clob"])*1.5
+        tri_sonuc = (kod_sayilari["K"] / puan_tri) * 100 if puan_tri > 0 else 0
 
-        # Metrikleri Göster
-        calc_cols = st.columns(7)
-        calc_cols[0].metric("%G", f"%{g_yuzde:.0f}")
-        calc_cols[1].metric("%D", f"%{d_yuzde:.0f}")
-        calc_cols[2].metric("R.C.", f"%{rc_yuzde:.0f}")
-        calc_cols[3].metric("%A", f"%{a_yuzde:.0f}")
-        calc_cols[4].metric("%H", f"%{h_yuzde:.0f}")
-        calc_cols[5].metric("%F", f"%{f_yuzde:.0f}")
-        calc_cols[6].metric("T.R.I.", f"%{tri_sonuc:.0f}")
-                    
+        # Renkli Kutuların Oluşturulması
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1: # SARI KUTU
+            st.markdown(f'<div class="sari-kutu"><b>%G:</b> %{g_yuzde:.0f}<br><b>%D:</b> %{d_yuzde:.0f}</div>', unsafe_allow_html=True)
+
+        with c2: # KIRMIZI KUTU (F)
+            st.markdown(f'<div class="kirmizi-kutu"><b>%F:</b> %{f_yuzde:.0f}</div>', unsafe_allow_html=True)
+
+        with c3: # MOR KUTU
+            st.markdown(f'<div class="mor-kutu"><b>%A:</b> %{a_yuzde:.0f}<br><b>%H:</b> %{h_yuzde:.0f}</div>', unsafe_allow_html=True)
+
+        with c4: # KIRMIZI KUTU (TRI ve RC)
+            st.markdown(f'<div class="kirmizi-kutu"><b>TRI:</b> %{tri_sonuc:.0f}<br><b>RC:</b> %{rc_yuzde:.0f}</div>', unsafe_allow_html=True)
+
     else:
         st.error("Giriş yapılmadı.")
+
+# Footer İmza
+st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
