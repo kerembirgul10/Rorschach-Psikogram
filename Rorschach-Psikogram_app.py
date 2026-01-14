@@ -1,15 +1,16 @@
 import streamlit as st
 from collections import Counter
+from io import BytesIO
+
+# Kütüphane kontrolünü sessizce yapıyoruz
 try:
     from docx import Document
-    from docx.shared import Pt
 except ImportError:
-    st.error("Lütfen requirements.txt dosyasına 'python-docx' ekleyin.")
-from io import BytesIO
+    pass
 
 st.set_page_config(page_title="Rorschach Psikogram", layout="wide")
 
-# Kurumsal Sabit Tasarım
+# Kurumsal Sabit Tasarım CSS
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; }
@@ -27,7 +28,6 @@ st.markdown("""
     .metric-label { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
     .metric-value { font-size: 26px; font-weight: 900; }
     
-    /* Yüksek Okunabilirlikli Kurumsal Renkler */
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
     .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
@@ -46,34 +46,31 @@ YAN_DAL = ["Ban", "Reddetme", "Şok"]
 HEPSI_TANIMLI = set(GRUP_1 + GRUP_2 + GRUP_3 + YAN_DAL)
 
 # --- GİRİŞ ---
-st.write("Kart Yanıtları (Yanıtları ayırmak için her yanıtın sonuna ; koyun)")
 kart_verileri = []
 for i in range(1, 11):
     kart_verileri.append(st.text_area(f"Kart {i}", key=f"kart_{i}", height=100))
 
 # Word Dosyası Oluşturma Fonksiyonu
-def generate_docx(r_count, counts, calculations, extras):
-    doc = Document()
-    doc.add_heading('Rorschach Psikogram Raporu', 0)
-    doc.add_paragraph(f'Toplam Yanıt (R): {r_count}')
-    
-    doc.add_heading('Kod Dağılımları', level=1)
-    for k, v in counts.items():
-        if v > 0:
-            doc.add_paragraph(f'{k}: {v}')
-    
-    doc.add_heading('Psikogram Oranları', level=1)
-    for name, val in calculations.items():
-        doc.add_paragraph(f'{name}: %{val:.0f}')
-    
-    if extras:
-        doc.add_heading('İstisna Kodlar', level=1)
-        doc.add_paragraph(", ".join([f"{k} ({v})" for k, v in extras.items()]))
-
-    doc.add_paragraph('\n\nHazırlayan: Kerem Birgül')
-    bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+def create_report(r_count, counts, calculations, extras):
+    try:
+        doc = Document()
+        doc.add_heading('Rorschach Psikogram Analiz Raporu', 0)
+        doc.add_paragraph(f'Toplam Yanıt (R): {r_count}')
+        
+        doc.add_heading('Kod Dağılımları', level=1)
+        for k, v in counts.items():
+            if v > 0: doc.add_paragraph(f'{k}: {v}')
+        
+        doc.add_heading('Psikogram Oranları', level=1)
+        for name, val in calculations.items():
+            doc.add_paragraph(f'{name}: %{val:.0f}')
+        
+        doc.add_paragraph('\nHazırlayan: Kerem Birgül')
+        bio = BytesIO()
+        doc.save(bio)
+        return bio.getvalue()
+    except Exception as e:
+        return None
 
 if st.button("Analizi Tamamla"):
     total_r = 0
@@ -82,7 +79,6 @@ if st.button("Analizi Tamamla"):
     
     for i, data in enumerate(kart_verileri, 1):
         if data.strip():
-            # Yanıtları ayır
             raw_responses = data.replace(';', '\n').split('\n')
             for resp in raw_responses:
                 clean_resp = resp.strip()
@@ -103,7 +99,6 @@ if st.button("Analizi Tamamla"):
                 for k in group:
                     if counts[k] > 0: st.write(f"**{k}:** {counts[k]}")
 
-        # İstisnaları Kutuya Al
         tanimsizlar = {k: v for k, v in counts.items() if k not in HEPSI_TANIMLI}
         if tanimsizlar:
             st.info(" ".join([f"**{k}:** {v} |" for k, v in tanimsizlar.items()]))
@@ -122,22 +117,20 @@ if st.button("Analizi Tamamla"):
         p_tri = (counts["FC"]+counts["FC'"]+counts["Fclob"])*0.5 + (counts["CF"]+counts["C'F"]+counts["ClobF"])*1 + (counts["C"]+counts["C'"]+counts["Clob"])*1.5
         calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
 
-        # Yeni Renkli Kutular
+        # Renkli Kutular
         col_1, col_2, col_3, col_4 = st.columns(4)
         with col_1: st.markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
         with col_2: st.markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
         with col_3: st.markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
         with col_4: st.markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
-        # Word Çıktısı
-        docx_file = generate_docx(total_r, counts, calc, tanimsizlar)
-        st.download_button(
-            label="📄 Raporu Word Olarak İndir",
-            data=docx_file,
-            file_name=f"Rorschach_Rapor_{total_r}R.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        # Word İndirme
+        word_data = create_report(total_r, counts, calc, tanimsizlar)
+        if word_data:
+            st.download_button(label="📄 Raporu Word Olarak İndir", data=word_data, file_name=f"Rorschach_Rapor.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        else:
+            st.error("Word dosyası oluşturulurken bir hata oluştu. Kütüphane yükleniyor olabilir, lütfen sayfayı yenileyip tekrar deneyin.")
     else:
-        st.warning("Henüz geçerli bir veri girmediniz.")
+        st.warning("Veri girişi yapılmadı.")
 
 st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
