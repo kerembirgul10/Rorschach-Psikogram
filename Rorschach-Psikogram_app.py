@@ -9,7 +9,7 @@ except ImportError:
 
 st.set_page_config(page_title="Rorschach Klinik Analiz", layout="wide")
 
-# Kurumsal Stil
+# Kurumsal Stil ve Renk Tanımlamaları
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; }
@@ -24,6 +24,25 @@ st.markdown("""
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
     .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
+    
+    /* Kart Başlık Şeritleri İçin Özel Tasarım */
+    .kart-header {
+        padding: 12px;
+        border-radius: 8px 8px 0px 0px;
+        color: #333;
+        font-weight: bold;
+        font-size: 18px;
+        border: 1px solid #ddd;
+        border-bottom: none;
+        margin-top: 25px;
+    }
+    .entry-box {
+        padding: 15px;
+        border-radius: 0px 0px 8px 8px;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        background-color: #ffffff;
+    }
     
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; font-weight: 500; }
     </style>
@@ -57,22 +76,41 @@ worst_reason = st.text_area("Beğenmeme Nedeni", height=60, key="wr")
 
 st.divider()
 
-# --- 3. BÖLÜM: PROTOKOL GİRİŞİ (YANIT - ANKET - KODLAR) ---
+# --- 3. BÖLÜM: PROTOKOL GİRİŞİ (RENKLİ KART BAŞLIKLARI) ---
 st.subheader("Protokol ve Kodlama")
-renkler = ["#f0f4ff", "#fff0f0", "#f0fff0", "#fffaf0", "#f0ffff", "#f5f0ff", "#fff0f5", "#fdf5e6", "#f0fff4", "#f8f8f8"]
 
-protokol_verileri = [] # (yanit, anket, kodlar) şeklinde tutulacak
+# Her kart için özel bir renk (Arka plan renkleri)
+kart_renkleri = [
+    "#E3F2FD", # Kart 1 - Açık Mavi
+    "#FFEBEE", # Kart 2 - Açık Kırmızı
+    "#F3E5F5", # Kart 3 - Açık Mor
+    "#E8EAF6", # Kart 4 - İndigo
+    "#E0F2F1", # Kart 5 - Turkuaz
+    "#F1F8E9", # Kart 6 - Açık Yeşil
+    "#FFFDE7", # Kart 7 - Açık Sarı
+    "#FFF3E0", # Kart 8 - Açık Turuncu
+    "#FBE9E7", # Kart 9 - Kırmızımsı Turuncu
+    "#ECEFF1"  # Kart 10 - Gri Mavi
+]
+
+protokol_verileri = []
 
 for i in range(1, 11):
-    st.markdown(f'<div style="background-color:{renkler[i-1]}; padding:10px; border-radius:5px; border:1px solid #ddd; margin-top:20px; font-weight:bold;">Kart {i}</div>', unsafe_allow_html=True)
+    # Renkli Başlık
+    st.markdown(f'<div class="kart-header" style="background-color:{kart_renkleri[i-1]};">Kart {i}</div>', unsafe_allow_html=True)
     
-    col_yanit, col_anket = st.columns(2)
-    with col_yanit:
-        yanit = st.text_area("Yanıtlar", key=f"yanit_{i}", height=100, placeholder=f"Kart {i} için hastanın sözel yanıtları...")
-    with col_anket:
-        anket = st.text_area("Anket (Soruşturma)", key=f"anket_{i}", height=100, placeholder="Yerleşimi ve belirleyicileri netleştirmek için sorular/cevaplar...")
-    
-    kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="G F+ H; D F- A; ...")
+    # Giriş Alanı (Beyaz kutu içinde)
+    with st.container():
+        st.markdown('<div class="entry-box">', unsafe_allow_html=True)
+        col_yanit, col_anket = st.columns(2)
+        with col_yanit:
+            yanit = st.text_area("Yanıtlar", key=f"yanit_{i}", height=100)
+        with col_anket:
+            anket = st.text_area("Anket (Soruşturma)", key=f"anket_{i}", height=100)
+        
+        kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="G F+ H; D F- A; ...")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     protokol_verileri.append({"yanit": yanit, "anket": anket, "kodlar": kodlar})
 
 # --- 4. BÖLÜM: ANALİZ VE WORD ÇIKTISI ---
@@ -81,7 +119,6 @@ if st.button("Analizi Gerçekleştir ve Protokolü İndir"):
     r_8910 = 0
     all_codes = []
     
-    # Hesaplama için kodları işle
     for i, data in enumerate(protokol_verileri, 1):
         kod_metni = data["kodlar"]
         if kod_metni.strip():
@@ -96,7 +133,6 @@ if st.button("Analizi Gerçekleştir ve Protokolü İndir"):
 
     if total_r > 0:
         counts = Counter(all_codes)
-        # (Hesaplama formülleri aynı kalıyor)
         calc = {
             "%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100,
             "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100,
@@ -116,31 +152,27 @@ if st.button("Analizi Gerçekleştir ve Protokolü İndir"):
         res_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
         res_cols[3].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
-        # WORD RAPORU
         try:
             doc = Document()
-            doc.add_heading('Rorschach Test Protokolü ve Analizi', 0)
+            doc.add_heading('Rorschach Test Protokolü', 0)
             doc.add_paragraph(f'Hasta: {h_isim} | Yaş: {h_yas}')
             
-            # Protokol Tablosu
-            doc.add_heading('Test Protokolü', level=1)
+            doc.add_heading('Protokol Tabloları', level=1)
             for i, p in enumerate(protokol_verileri, 1):
                 doc.add_heading(f'Kart {i}', level=2)
-                table = doc.add_table(rows=1, cols=3)
+                table = doc.add_table(rows=2, cols=3)
                 table.style = 'Table Grid'
-                hdr_cells = table.rows[0].cells
-                hdr_cells[0].text = 'Yanıt'
-                hdr_cells[1].text = 'Anket'
-                hdr_cells[2].text = 'Kodlar'
-                
-                row_cells = table.add_row().cells
-                row_cells[0].text = p["yanit"]
-                row_cells[1].text = p["anket"]
-                row_cells[2].text = p["kodlar"]
+                # Başlıklar
+                table.rows[0].cells[0].text = 'Yanıt'
+                table.rows[0].cells[1].text = 'Anket'
+                table.rows[0].cells[2].text = 'Kodlar'
+                # Veriler
+                table.rows[1].cells[0].text = p["yanit"]
+                table.rows[1].cells[1].text = p["anket"]
+                table.rows[1].cells[2].text = p["kodlar"]
             
-            # (Kart tercihleri ve psikogram sonuçları da rapora ekleniyor...)
             bio = BytesIO(); doc.save(bio)
-            st.download_button("📄 Word Protokolünü İndir", bio.getvalue(), f"{h_isim}_Rorschach_Protokol.docx")
+            st.download_button("📄 Word Protokolünü İndir", bio.getvalue(), f"{h_isim}_Rorschach.docx")
         except: st.error("Rapor oluşturulamadı.")
     else:
         st.warning("Veri girişi yapılmadı.")
