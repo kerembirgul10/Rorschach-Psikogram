@@ -2,36 +2,31 @@ import streamlit as st
 from collections import Counter
 from io import BytesIO
 
-# Kütüphane kontrolünü sessizce yapıyoruz
+# Kütüphaneyi en güvenli şekilde çağıralım
 try:
+    import docx
     from docx import Document
-except ImportError:
-    pass
+    WORD_READY = True
+except Exception:
+    WORD_READY = False
 
 st.set_page_config(page_title="Rorschach Psikogram", layout="wide")
 
-# Kurumsal Sabit Tasarım CSS
+# Kurumsal Sabit Tasarım
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; }
     .metric-container {
-        height: 110px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: #1a1a1a;
+        height: 110px; display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        border-radius: 10px; margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
     }
     .metric-label { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
     .metric-value { font-size: 26px; font-weight: 900; }
-    
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
     .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
-    
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; font-weight: 500; }
     </style>
     """, unsafe_allow_html=True)
@@ -45,32 +40,9 @@ GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğ
 YAN_DAL = ["Ban", "Reddetme", "Şok"]
 HEPSI_TANIMLI = set(GRUP_1 + GRUP_2 + GRUP_3 + YAN_DAL)
 
-# --- GİRİŞ ---
 kart_verileri = []
 for i in range(1, 11):
     kart_verileri.append(st.text_area(f"Kart {i}", key=f"kart_{i}", height=100))
-
-# Word Dosyası Oluşturma Fonksiyonu
-def create_report(r_count, counts, calculations, extras):
-    try:
-        doc = Document()
-        doc.add_heading('Rorschach Psikogram Analiz Raporu', 0)
-        doc.add_paragraph(f'Toplam Yanıt (R): {r_count}')
-        
-        doc.add_heading('Kod Dağılımları', level=1)
-        for k, v in counts.items():
-            if v > 0: doc.add_paragraph(f'{k}: {v}')
-        
-        doc.add_heading('Psikogram Oranları', level=1)
-        for name, val in calculations.items():
-            doc.add_paragraph(f'{name}: %{val:.0f}')
-        
-        doc.add_paragraph('\nHazırlayan: Kerem Birgül')
-        bio = BytesIO()
-        doc.save(bio)
-        return bio.getvalue()
-    except Exception as e:
-        return None
 
 if st.button("Analizi Tamamla"):
     total_r = 0
@@ -92,16 +64,11 @@ if st.button("Analizi Tamamla"):
         st.subheader(f"R:{total_r}")
         counts = Counter(all_codes)
         
-        # Kod Gösterimi
         c_list = st.columns(4)
         for idx, group in enumerate([GRUP_1, GRUP_2, GRUP_3, YAN_DAL]):
             with c_list[idx]:
                 for k in group:
                     if counts[k] > 0: st.write(f"**{k}:** {counts[k]}")
-
-        tanimsizlar = {k: v for k, v in counts.items() if k not in HEPSI_TANIMLI}
-        if tanimsizlar:
-            st.info(" ".join([f"**{k}:** {v} |" for k, v in tanimsizlar.items()]))
 
         st.divider()
 
@@ -114,10 +81,11 @@ if st.button("Analizi Tamamla"):
             "%H": ((counts["H"]+counts["Hd"])/total_r)*100,
             "RC": (r_8910/total_r)*100
         }
-        p_tri = (counts["FC"]+counts["FC'"]+counts["Fclob"])*0.5 + (counts["CF"]+counts["C'F"]+counts["ClobF"])*1 + (counts["C"]+counts["C'"]+counts["Clob"])*1.5
+        p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + \
+                (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + \
+                (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
         calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
 
-        # Renkli Kutular
         col_1, col_2, col_3, col_4 = st.columns(4)
         with col_1: st.markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
         with col_2: st.markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -125,11 +93,19 @@ if st.button("Analizi Tamamla"):
         with col_4: st.markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
         # Word İndirme
-        word_data = create_report(total_r, counts, calc, tanimsizlar)
-        if word_data:
-            st.download_button(label="📄 Raporu Word Olarak İndir", data=word_data, file_name=f"Rorschach_Rapor.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        if WORD_READY:
+            try:
+                doc = Document()
+                doc.add_heading('Rorschach Psikogram Analizi', 0)
+                doc.add_paragraph(f'R: {total_r}')
+                bio = BytesIO()
+                doc.save(bio)
+                st.download_button(label="📄 Word Olarak İndir", data=bio.getvalue(), file_name="Psikogram_Raporu.docx")
+            except Exception:
+                st.warning("Dosya hazırlanırken bir hata oluştu.")
         else:
-            st.error("Word dosyası oluşturulurken bir hata oluştu. Kütüphane yükleniyor olabilir, lütfen sayfayı yenileyip tekrar deneyin.")
+            st.error("Sistem bileşenleri yükleniyor, lütfen sayfayı yenileyin.")
+
     else:
         st.warning("Veri girişi yapılmadı.")
 
