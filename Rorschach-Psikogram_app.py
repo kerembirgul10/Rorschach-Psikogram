@@ -9,10 +9,10 @@ except ImportError:
 
 st.set_page_config(page_title="Rorschach Klinik Analiz", layout="wide")
 
-# Kurumsal Stil ve Renk Tanımlamaları
+# Yeni Canlı Tasarım ve Stil Ayarları
 st.markdown("""
     <style>
-    textarea { resize: none !important; border: 1px solid #ced4da !important; }
+    textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
     .metric-container {
         height: 110px; display: flex; flex-direction: column;
         justify-content: center; align-items: center;
@@ -25,23 +25,22 @@ st.markdown("""
     .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
     
-    /* Kart Başlık Şeritleri İçin Özel Tasarım */
-    .kart-header {
-        padding: 12px;
-        border-radius: 8px 8px 0px 0px;
-        color: #333;
-        font-weight: bold;
-        font-size: 18px;
-        border: 1px solid #ddd;
-        border-bottom: none;
-        margin-top: 25px;
+    /* Kart Konteynırı */
+    .kart-wrapper {
+        padding: 20px;
+        border-radius: 15px;
+        margin-top: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
     }
-    .entry-box {
-        padding: 15px;
-        border-radius: 0px 0px 8px 8px;
-        border: 1px solid #ddd;
-        margin-bottom: 10px;
-        background-color: #ffffff;
+    .kart-title {
+        font-size: 22px;
+        font-weight: 800;
+        margin-bottom: 15px;
+        color: #2c3e50;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; font-weight: 500; }
@@ -76,41 +75,39 @@ worst_reason = st.text_area("Beğenmeme Nedeni", height=60, key="wr")
 
 st.divider()
 
-# --- 3. BÖLÜM: PROTOKOL GİRİŞİ (RENKLİ KART BAŞLIKLARI) ---
+# --- 3. BÖLÜM: PROTOKOL GİRİŞİ (CANLI RENKLER) ---
 st.subheader("Protokol ve Kodlama")
 
-# Her kart için özel bir renk (Arka plan renkleri)
-kart_renkleri = [
-    "#E3F2FD", # Kart 1 - Açık Mavi
-    "#FFEBEE", # Kart 2 - Açık Kırmızı
-    "#F3E5F5", # Kart 3 - Açık Mor
-    "#E8EAF6", # Kart 4 - İndigo
-    "#E0F2F1", # Kart 5 - Turkuaz
-    "#F1F8E9", # Kart 6 - Açık Yeşil
-    "#FFFDE7", # Kart 7 - Açık Sarı
-    "#FFF3E0", # Kart 8 - Açık Turuncu
-    "#FBE9E7", # Kart 9 - Kırmızımsı Turuncu
-    "#ECEFF1"  # Kart 10 - Gri Mavi
+# Daha canlı ve doygun renkler
+canli_renkler = [
+    "#D1E9FF", # Kart 1 - Mavi
+    "#FFD1D1", # Kart 2 - Kırmızı
+    "#E9D1FF", # Kart 3 - Mor
+    "#D1D5FF", # Kart 4 - İndigo
+    "#D1FFF9", # Kart 5 - Cam Göbeği
+    "#DFFFDE", # Kart 6 - Yeşil
+    "#FFFBD1", # Kart 7 - Sarı
+    "#FFE8D1", # Kart 8 - Turuncu
+    "#FFD1C2", # Kart 9 - Somon
+    "#E2E2E2"  # Kart 10 - Gümüş
 ]
 
 protokol_verileri = []
 
 for i in range(1, 11):
-    # Renkli Başlık
-    st.markdown(f'<div class="kart-header" style="background-color:{kart_renkleri[i-1]};">Kart {i}</div>', unsafe_allow_html=True)
+    # Tek parça renkli blok başlatma
+    st.markdown(f'<div class="kart-wrapper" style="background-color:{canli_renkler[i-1]};">', unsafe_allow_html=True)
+    st.markdown(f'<div class="kart-title">Kart {i}</div>', unsafe_allow_html=True)
     
-    # Giriş Alanı (Beyaz kutu içinde)
-    with st.container():
-        st.markdown('<div class="entry-box">', unsafe_allow_html=True)
-        col_yanit, col_anket = st.columns(2)
-        with col_yanit:
-            yanit = st.text_area("Yanıtlar", key=f"yanit_{i}", height=100)
-        with col_anket:
-            anket = st.text_area("Anket (Soruşturma)", key=f"anket_{i}", height=100)
-        
-        kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="G F+ H; D F- A; ...")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
+    col_yanit, col_anket = st.columns(2)
+    with col_yanit:
+        yanit = st.text_area("Yanıtlar", key=f"yanit_{i}", height=100)
+    with col_anket:
+        anket = st.text_area("Anket", key=f"anket_{i}", height=100) # Soruşturma yazısı kaldırıldı
+    
+    kodlar = st.text_area("Kodlar", key=f"kod_{i}", height=80, placeholder="") # Placeholder temizlendi
+    st.markdown('</div>', unsafe_allow_html=True) # Konteynırı kapat
+    
     protokol_verileri.append({"yanit": yanit, "anket": anket, "kodlar": kodlar})
 
 # --- 4. BÖLÜM: ANALİZ VE WORD ÇIKTISI ---
@@ -157,16 +154,14 @@ if st.button("Analizi Gerçekleştir ve Protokolü İndir"):
             doc.add_heading('Rorschach Test Protokolü', 0)
             doc.add_paragraph(f'Hasta: {h_isim} | Yaş: {h_yas}')
             
-            doc.add_heading('Protokol Tabloları', level=1)
+            doc.add_heading('Protokol Verileri', level=1)
             for i, p in enumerate(protokol_verileri, 1):
                 doc.add_heading(f'Kart {i}', level=2)
                 table = doc.add_table(rows=2, cols=3)
                 table.style = 'Table Grid'
-                # Başlıklar
                 table.rows[0].cells[0].text = 'Yanıt'
                 table.rows[0].cells[1].text = 'Anket'
                 table.rows[0].cells[2].text = 'Kodlar'
-                # Veriler
                 table.rows[1].cells[0].text = p["yanit"]
                 table.rows[1].cells[1].text = p["anket"]
                 table.rows[1].cells[2].text = p["kodlar"]
