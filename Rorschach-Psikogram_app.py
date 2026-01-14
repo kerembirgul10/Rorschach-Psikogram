@@ -1,9 +1,9 @@
 import streamlit as st
 from collections import Counter
 
-st.set_page_config(page_title="Kod Analiz Sistemi", layout="centered")
+st.set_page_config(page_title="R Analiz", layout="centered")
 
-st.title("📊 Kart Kod Analiz Paneli")
+st.title("📊 R Analiz Paneli")
 
 # --- TANIMLI LİSTELER ---
 ANA_VE_YAN_LISTE = [
@@ -19,14 +19,14 @@ ANA_VE_YAN_LISTE = [
 ]
 
 # --- GİRİŞ ALANLARI ---
-st.subheader("Kart Yanıtlarını Girin")
+st.subheader("Kartlar")
 kart_verileri = []
 
 for i in range(1, 11):
-    kod_girisi = st.text_area(f"Kart {i}:", key=f"kart_{i}", height=90)
+    kod_girisi = st.text_area(f"Kart {i}", key=f"kart_{i}", height=90)
     kart_verileri.append(kod_girisi)
 
-if st.button("🚀 Kodları Analiz Et"):
+if st.button("🚀 Analiz"):
     toplam_r_sayisi = 0
     tum_kodlar = []
     
@@ -46,24 +46,22 @@ if st.button("🚀 Kodları Analiz Et"):
                         tum_kodlar.append(k)
 
     if toplam_r_sayisi > 0:
-        st.subheader(f"Toplam Yanıt: {toplam_r_sayisi} (R)")
+        # İstediğin format: R:5
+        st.subheader(f"R:{toplam_r_sayisi}")
         st.divider()
 
         kod_sayilari = Counter(tum_kodlar)
         
         # --- SIRALI LİSTELEME ---
-        # Önce listede olanları senin sıranla yazdır
+        # Tanımlı kodları yazdır
         for k in ANA_VE_YAN_LISTE:
             if kod_sayilari[k] > 0:
                 st.write(f"**{k}:** {kod_sayilari[k]}")
         
-        # --- İSTİSNALARI RENKLİ KUTUDA SIRALA ---
-        # Listede olmayan ama girişi yapılan kodları bul
+        # --- TANIMSIZ KODLAR (Mavi kutu içinde, başlıksız) ---
         tanimsizlar = [k for k in kod_sayilari if k not in ANA_VE_YAN_LISTE]
-        
         for k in tanimsizlar:
-            # Grup ismi yazmadan sadece pastel renkli kutu içinde kod ve sayısı
             st.info(f"**{k}:** {kod_sayilari[k]}")
                     
     else:
-        st.error("Lütfen analiz için geçerli bir yanıt girin.")
+        st.error("Giriş yapılmadı.")
