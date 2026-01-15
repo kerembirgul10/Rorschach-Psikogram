@@ -285,9 +285,8 @@ else:
             
     st.divider()
 
-    # --- SAYFA İÇERİKLERİ ---
+   # --- SAYFA İÇERİKLERİ ---
     if st.session_state['page'] == "Hastalarim":
-        # Eğer bir hasta seçilmemişse listeyi göster
         if not st.session_state['editing_patient']:
             search = st.text_input("", placeholder="Hasta Ara...")
             data = pd.DataFrame(patient_sheet.get_all_records())
@@ -295,23 +294,72 @@ else:
             
             if not my_p.empty:
                 filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
+                
+                # Başlık Satırı
+                st.markdown("---")
+                h_col1, h_col2, h_col3 = st.columns([3, 1, 1])
+                h_col1.write("**Hasta Adı**")
+                h_col2.write("**Rapor**")
+                h_col3.write("**İşlem**")
+                
                 for _, row in filt.iterrows():
-                    # Hastayı seçince listeyi gizlemesi için primary buton mantığı
-                    if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True):
+                    r_col1, r_col2, r_col3 = st.columns([3, 1, 1])
+                    
+                    # 1. Hasta Adı (Tıklayınca Düzenleme Açılır)
+                    if r_col1.button(row['hasta_adi'], key=f"edit_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict()
+                        st.rerun()
+                    
+                    # 2. Raporu İndir Butonu
+                    try:
+                        # Rapor için gerekli verileri hazırla
+                        p_data = json.loads(row['protokol_verisi'])
+                        # Kodları say ve analizi yap (Word fonksiyonu için)
+                        all_c = []
+                        total_r = 0
+                        r8910 = 0
+                        for idx, d in enumerate(p_data, 1):
+                            if d["kodlar"].strip():
+                                lines = d["kodlar"].replace(';', '\n').split('\n')
+                                for line in lines:
+                                    if not line.strip() or line.strip().lower() == "reddetme": continue
+                                    total_r += 1
+                                    if idx in [8, 9, 10]: r8910 += 1
+                                    for code in line.replace(",", " ").split():
+                                        all_c.append(code.strip())
+                        
+                        counts = Counter(all_c)
+                        # Basit bir calc sözlüğü oluştur (Fonksiyonun hata almaması için)
+                        calc = {"R": total_r} # create_word_report içindeki anahtar kelimelere göre genişletilebilir
+                        
+                        # Word raporunu oluştur
+                        report_bio = create_word_report(
+                            {'name': row['hasta_adi'], 'age': row['yas'], 'comment': row['klinik_yorum']}, 
+                            {}, # Boş calc (veya yukarıdaki analiz mantığı eklenebilir)
+                            counts, total_r, row['en_begendigi'], row['en_beğenmediği'], 
+                            row['en_begendigi_neden'], row['en_beğenmediği_neden'], 
+                            p_data, row['tarih']
+                        )
+                        
+                        r_col2.download_button("📄 İndir", report_bio, f"{row['hasta_adi']}_Rorschach.docx", key=f"dl_{_}")
+                    except:
+                        r_col2.write("⚠️ Hata")
+
+                    # 3. Silme Butonu
+                    if r_col3.button("🗑️ Sil", key=f"del_{_}", type="secondary"):
+                        # Google Sheets'ten silme işlemi
+                        cell = patient_sheet.find(row['hasta_adi'])
+                        patient_sheet.delete_rows(cell.row)
+                        st.success(f"{row['hasta_adi']} silindi.")
                         st.rerun()
             else: 
                 st.info("Kayıtlı hasta bulunamadı.")
         
-        # Eğer bir hasta seçilmişse (Kapat butonu ve Analiz Formu)
         else:
-            if st.button("Kapat", type="primary"): 
+            if st.button("← Listeye Geri Dön", type="primary"): 
                 st.session_state['editing_patient'] = None
                 st.rerun()
             analysis_form(st.session_state['editing_patient'])
-            
-    elif st.session_state['page'] == "Yeni Hasta Ekle": 
-        analysis_form()
 
 # Footer
 st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
