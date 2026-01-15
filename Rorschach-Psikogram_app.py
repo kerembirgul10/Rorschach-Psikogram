@@ -18,7 +18,8 @@ except ImportError:
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
-GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"] # Yeni Eklenen Grup
+GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"]
+TUM_GRUPLAR = GRUP_1 + GRUP_2 + GRUP_3 + GRUP_4
 
 # --- 2. GOOGLE SHEETS BAĞLANTISI ---
 @st.cache_resource
@@ -42,28 +43,29 @@ st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
     
-    /* Psikogram Kutu Renkleri (ESKİ HALİNE DÖNDÜ) */
     .metric-container {
-        height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center;
-        border-radius: 10px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
+        height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+        border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
+        width: 100%;
     }
-    .metric-label { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
-    .metric-value { font-size: 24px; font-weight: 900; }
-    .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
-    .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
-    .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
+    .metric-label { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
+    .metric-value { font-size: 20px; font-weight: 900; }
+    
+    /* Psikogram Renkleri */
+    .c-g { background-color: #FFD93D; border: 2px solid #E2B200; }
+    .c-d { background-color: #FFB347; border: 2px solid #E67E22; }
+    .c-f { background-color: #FF6B6B; border: 2px solid #D63031; }
+    .c-a { background-color: #A29BFE; border: 2px solid #6C5CE7; }
+    .c-h { background-color: #D1A3FF; border: 2px solid #8E44AD; }
+    .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
+    .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
     
     .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
     .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     
-    /* Üst Menü Aktif Buton Rengi (YEŞİL KALDI) */
-    button[kind="primary"] {
-        background-color: #2ECC71 !important;
-        color: white !important;
-        border: none !important;
-    }
+    button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +83,7 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
     
-    doc.add_heading('Test Protokolu (Yanitlar, Anketler ve Kodlar)', level=1)
+    doc.add_heading('Test Protokolu', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr = table.rows[0].cells
     hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanit', 'Anket', 'Kodlar'
@@ -94,7 +96,8 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
     
     doc.add_heading('Kod Frekanslari', level=2)
-    doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
+    diag_codes = [f"{k}: {v}" for k, v in counts.items() if v > 0]
+    doc.add_paragraph(", ".join(diag_codes))
     
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
@@ -175,16 +178,29 @@ def analysis_form(edit_data=None):
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
             
-            st.subheader(f"Analiz (R: {total_r})")
-            m_cols = st.columns(4)
-            m_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
-            m_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
-            m_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
-            m_cols[3].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
+            st.subheader(f"Psikogram Analizi (R: {total_r})")
+            m_cols = st.columns(7) # 7 Kutuyu yan yana koyuyoruz
+            m_cols[0].markdown(f'<div class="metric-container c-g"><div class="metric-label">%G</div><div class="metric-value">%{calc["%G"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[1].markdown(f'<div class="metric-container c-d"><div class="metric-label">%D</div><div class="metric-value">%{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[2].markdown(f'<div class="metric-container c-f"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[3].markdown(f'<div class="metric-container c-a"><div class="metric-label">%A</div><div class="metric-value">%{calc["%A"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[4].markdown(f'<div class="metric-container c-h"><div class="metric-label">%H</div><div class="metric-value">%{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[5].markdown(f'<div class="metric-container c-tri"><div class="metric-label">TRI</div><div class="metric-value">%{calc["TRI"]:.0f}</div></div>', unsafe_allow_html=True)
+            m_cols[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
-            st.write("**Grup Kod Dagilimi:**")
-            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3), ("Ozel Gruplar", GRUP_4)]:
+            st.write("**Kod Frekanslari:**")
+            # Gruplandirilmis kodlar
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
                 st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
+            
+            # GRUP 4 ve Diger Kodlar (Mimari vb.)
+            special_codes = [f"{k}: {counts[k]}" for k in GRUP_4 if counts[k] > 0]
+            if special_codes:
+                st.write(" | ".join(special_codes))
+            
+            other_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
+            if other_codes:
+                st.write("**Diger Kodlar:** " + " | ".join(other_codes))
 
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
