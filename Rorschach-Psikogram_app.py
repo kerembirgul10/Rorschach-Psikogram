@@ -131,7 +131,7 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
         ("Lokalizasyon", GRUP_1),
         ("Belirleyiciler", GRUP_2),
         ("İçerik", GRUP_3),
-        ("Özel Kodlar (Grup 4)", GRUP_4)
+        ("Özel Kodlar", GRUP_4)
     ]
 
     for grup_adi, grup_liste in gruplar:
