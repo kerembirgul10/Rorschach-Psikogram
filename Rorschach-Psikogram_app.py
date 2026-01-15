@@ -220,17 +220,17 @@ def analysis_form(edit_data=None):
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
 
-# --- 6. NAVIGASYON VE GIRIS EKRANI ---
+# --- 6. NAVIGASYON VE GİRİŞ EKRANI ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
     
-    # Giriş ve Kayıt sekmelerini burada oluşturuyoruz
+    # Giriş ve Kayıt sekmeleri
     t1, t2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
     
     with t1:
         u = st.text_input("Kullanıcı Adı", key="login_u")
         p = st.text_input("Şifre", type="password", key="login_p")
-        if st.button("Giriş"):
+        if st.button("Sisteme Giriş"):
             df = pd.DataFrame(user_sheet.get_all_records())
             df.columns = df.columns.str.strip()
             if u in df['kullanici_adi'].values:
@@ -257,6 +257,61 @@ if not st.session_state['logged_in']:
                 st.warning("Lütfen tüm alanları doldurun.")
 
 else:
-    # Buradan sonrası mevcut giriş yapmış kullanıcı menüsü (Üst Menü) devam eder...
+    # --- ÜST MENÜ (GİRİŞ YAPILDIĞINDA GÖRÜNEN KISIM) ---
     c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
-    # ... (Önceki yazdığımız navigasyon kodları buraya gelecek)
+    
+    with c_user: 
+        st.markdown(f"#### {st.session_state['user']}")
+    
+    with c_nav1:
+        t_h = "primary" if st.session_state['page'] == "Hastalarim" else "secondary"
+        if st.button("Hastalarım", use_container_width=True, type=t_h): 
+            st.session_state['page'] = "Hastalarim"
+            st.rerun()
+            
+    with c_nav2:
+        t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
+        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): 
+            st.session_state['page'] = "Yeni Hasta Ekle"
+            st.session_state['editing_patient'] = None
+            # Formu sıfırlamak için yeni bir ID atıyoruz
+            st.session_state['form_id'] = datetime.now().timestamp()
+            st.rerun()
+            
+    with c_out:
+        if st.button("Çıkış", use_container_width=True): 
+            st.session_state['logged_in'] = False
+            st.rerun()
+            
+    st.divider()
+
+    # --- SAYFA İÇERİKLERİ ---
+    if st.session_state['page'] == "Hastalarim":
+        # Eğer bir hasta seçilmemişse listeyi göster
+        if not st.session_state['editing_patient']:
+            search = st.text_input("", placeholder="Hasta Ara...")
+            data = pd.DataFrame(patient_sheet.get_all_records())
+            my_p = data[data['sahip'] == st.session_state['user']]
+            
+            if not my_p.empty:
+                filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
+                for _, row in filt.iterrows():
+                    # Hastayı seçince listeyi gizlemesi için primary buton mantığı
+                    if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True):
+                        st.session_state['editing_patient'] = row.to_dict()
+                        st.rerun()
+            else: 
+                st.info("Kayıtlı hasta bulunamadı.")
+        
+        # Eğer bir hasta seçilmişse (Kapat butonu ve Analiz Formu)
+        else:
+            if st.button("Kapat", type="primary"): 
+                st.session_state['editing_patient'] = None
+                st.rerun()
+            analysis_form(st.session_state['editing_patient'])
+            
+    elif st.session_state['page'] == "Yeni Hasta Ekle": 
+        analysis_form()
+
+# Footer
+st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
