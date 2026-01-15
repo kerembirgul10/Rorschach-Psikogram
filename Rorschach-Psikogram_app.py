@@ -220,8 +220,6 @@ def analysis_form(edit_data=None):
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
 
-# --- 6. NAVIGASYON ---
-
 # --- 6. NAVIGASYON VE GIRIS EKRANI ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
