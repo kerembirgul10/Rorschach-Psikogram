@@ -16,6 +16,7 @@ except ImportError:
 
 # --- 1. GRUP TANIMLARI ---
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
+# Karakter uyumu için listeyi netleştiriyoruz
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
 GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"]
@@ -96,6 +97,7 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
     
     doc.add_heading('Kod Frekanslari', level=2)
+    # Tüm frekansları rapora yazıyoruz
     diag_codes = [f"{k}: {v}" for k, v in counts.items() if v > 0]
     doc.add_paragraph(", ".join(diag_codes))
     
@@ -164,13 +166,16 @@ def analysis_form(edit_data=None):
         total_r = 0; r_8910 = 0; all_codes = []
         for i, d in enumerate(protokol_verileri, 1):
             if d["kodlar"].strip():
+                # Hem enter hem noktalı virgül desteği
                 lines = d["kodlar"].replace(';', '\n').split('\n')
                 for line in lines:
                     line = line.strip()
                     if not line or line.lower() == "reddetme": continue
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
-                    for code in line.replace(",", " ").split(): all_codes.append(code)
+                    # Kodları parçala ve temizle
+                    for code in line.replace(",", " ").split(): 
+                        all_codes.append(code.strip())
         
         if total_r > 0:
             counts = Counter(all_codes)
@@ -179,7 +184,7 @@ def analysis_form(edit_data=None):
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
             
             st.subheader(f"Psikogram Analizi (R: {total_r})")
-            m_cols = st.columns(7) # 7 Kutuyu yan yana koyuyoruz
+            m_cols = st.columns(7)
             m_cols[0].markdown(f'<div class="metric-container c-g"><div class="metric-label">%G</div><div class="metric-value">%{calc["%G"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container c-d"><div class="metric-label">%D</div><div class="metric-value">%{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[2].markdown(f'<div class="metric-container c-f"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -189,15 +194,19 @@ def analysis_form(edit_data=None):
             m_cols[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
             st.write("**Kod Frekanslari:**")
-            # Gruplandirilmis kodlar
-            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
-                st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
+            # Lokalizasyon
+            st.write(f"**Lokalizasyon:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_1 if counts[k] > 0]))
+            # Belirleyiciler
+            st.write(f"**Belirleyiciler:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_2 if counts[k] > 0]))
+            # İçerik
+            st.write(f"**Icerik:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_3 if counts[k] > 0]))
             
-            # GRUP 4 ve Diger Kodlar (Mimari vb.)
+            # Özel Kodlar (Ban, Reddetme vb.)
             special_codes = [f"{k}: {counts[k]}" for k in GRUP_4 if counts[k] > 0]
             if special_codes:
                 st.write(" | ".join(special_codes))
             
+            # Diğer Kodlar (Mimari vb.)
             other_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
             if other_codes:
                 st.write("**Diger Kodlar:** " + " | ".join(other_codes))
