@@ -218,12 +218,12 @@ def analysis_form(edit_data=None):
 
 # --- 6. NAVIGASYON VE GİRİŞ ---
 if not st.session_state['logged_in']:
-    st.title("Rorschach Klinik Panel")
+    st.title("Rorschach Klinik Raporlama")
     t1, t2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
     with t1:
         u = st.text_input("Kullanıcı Adı", key="l_u")
         p = st.text_input("Şifre", type="password", key="l_p")
-        if st.button("Sisteme Giriş"):
+        if st.button("Giriş"):
             df = pd.DataFrame(user_sheet.get_all_records()); df.columns = df.columns.str.strip()
             if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
                 st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
