@@ -10,6 +10,8 @@ from datetime import datetime
 # WORD kütüphanesi
 try:
     from docx import Document
+    from docx.shared import Pt
+    from docx.enum.table import WD_TABLE_ALIGNMENT
 except ImportError:
     pass
 
@@ -60,10 +62,9 @@ if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarım"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. WORD RAPOR (GÜNCELLENDİ: TABLO KALDIRILDI) ---
-def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason):
+# --- 4. WORD RAPOR (GÜNCELLENDİ: TABLO EKLENDİ) ---
+def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol):
     doc = Document()
-    # Başlık hastanın ismi yapıldı
     doc.add_heading(h_info['name'], 0)
     
     doc.add_heading('Hasta Bilgileri', level=1)
@@ -75,6 +76,23 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_heading('Kart Tercihleri', level=1)
     doc.add_paragraph(f"Beğenilen: {b_cards} (Nedeni: {b_reason})")
     doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Nedeni: {w_reason})")
+
+    # TABLO BURAYA EKLENDİ
+    doc.add_heading('Test Protokolü (Yanıtlar, Anketler ve Kodlar)', level=1)
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Kart'
+    hdr_cells[1].text = 'Yanıt'
+    hdr_cells[2].text = 'Anket'
+    hdr_cells[3].text = 'Kodlar'
+
+    for i, p in enumerate(protokol, 1):
+        row_cells = table.add_row().cells
+        row_cells[0].text = str(i)
+        row_cells[1].text = str(p.get('yanit', ''))
+        row_cells[2].text = str(p.get('anket', ''))
+        row_cells[3].text = str(p.get('kodlar', ''))
 
     doc.add_heading('Psikogram Analizi', level=1)
     doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
@@ -97,7 +115,6 @@ def analysis_form(edit_data=None):
     h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100)
 
     st.divider(); st.subheader("Kart Tercihleri")
-    
     def box_selector(label, key_prefix, saved_val):
         st.write(label)
         saved_list = json.loads(saved_val) if saved_val else []
@@ -167,12 +184,11 @@ def analysis_form(edit_data=None):
             m_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[3].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
-            # GRUP KOD FREKANSLARI (PSİKOGRAM ALTINA EKLENDİ)
             st.write("**Grup Kod Dağılımı:**")
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3)]:
                 st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
 
-            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason)
+            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri)
             st.download_button("📄 Word İndir", report, f"{h_isim}_Rorschach.docx")
 
 # --- 6. NAVİGASYON ---
