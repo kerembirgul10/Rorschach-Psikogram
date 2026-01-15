@@ -16,7 +16,6 @@ except ImportError:
 
 # --- 1. GRUP TANIMLARI ---
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
-# Karakter çakışmasını önlemek için listeyi normalize ediyoruz
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
 GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"]
@@ -69,6 +68,12 @@ if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
+
+# Sıfırlama Fonksiyonu
+def reset_form_state():
+    for key in list(st.session_state.keys()):
+        if key.endswith("_list") or key.startswith("y_") or key.startswith("a_") or key.startswith("k_"):
+            del st.session_state[key]
 
 # --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
@@ -150,7 +155,7 @@ def analysis_form(edit_data=None):
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
-        st.success("Kaydedildi.") # SADECE KAYDEDİLDİ YAZIYOR
+        st.success("Kaydedildi.")
 
     if calc_clicked:
         total_r = 0; r_8910 = 0; all_codes = []
@@ -163,7 +168,6 @@ def analysis_form(edit_data=None):
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
                     for code in line.replace(",", " ").split(): 
-                        # Tırnak işareti normalleştirme (FC’ -> FC')
                         clean_code = code.replace("’", "'").replace("‘", "'").strip()
                         all_codes.append(clean_code)
         
@@ -173,7 +177,7 @@ def analysis_form(edit_data=None):
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
             
-            st.subheader(f"Psikogram Analizi (R: {total_r})")
+            st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(7)
             m_cols[0].markdown(f'<div class="metric-container c-g"><div class="metric-label">%G</div><div class="metric-value">%{calc["%G"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container c-d"><div class="metric-label">%D</div><div class="metric-value">%{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -187,10 +191,8 @@ def analysis_form(edit_data=None):
             st.write(f"**Lokalizasyon:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_1 if counts[k] > 0]))
             st.write(f"**Belirleyiciler:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_2 if counts[k] > 0]))
             st.write(f"**Icerik:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_3 if counts[k] > 0]))
-            
             special_codes = [f"{k}: {counts[k]}" for k in GRUP_4 if counts[k] > 0]
             if special_codes: st.write(" | ".join(special_codes))
-            
             other_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
             if other_codes: st.write("**Diger Kodlar:** " + " | ".join(other_codes))
 
@@ -210,29 +212,37 @@ else:
     with c_user: st.markdown(f"#### {st.session_state['user']}")
     with c_nav1:
         t_h = "primary" if st.session_state['page'] == "Hastalarim" else "secondary"
-        if st.button("Hastalarim", use_container_width=True, type=t_h): st.session_state['page'] = "Hastalarim"; st.rerun()
+        if st.button("Hastalarim", use_container_width=True, type=t_h): 
+            st.session_state['page'] = "Hastalarim"; st.rerun()
     with c_nav2:
         t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
-        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
+        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): 
+            st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; 
+            reset_form_state(); st.rerun()
     with c_out:
         if st.button("Cikis", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
     st.divider()
 
     if st.session_state['page'] == "Hastalarim":
-        search = st.text_input("", placeholder="Hasta Ara...")
-        data = pd.DataFrame(patient_sheet.get_all_records())
-        my_p = data[data['sahip'] == st.session_state['user']]
-        if not my_p.empty:
-            filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
-            for _, row in filt.iterrows():
-                act = st.session_state['editing_patient'] and st.session_state['editing_patient']['hasta_adi'] == row['hasta_adi']
-                if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True, type="primary" if act else "secondary"):
-                    st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-            if st.session_state['editing_patient']:
-                st.divider()
-                if st.button("Kapat"): st.session_state['editing_patient'] = None; st.rerun()
-                analysis_form(st.session_state['editing_patient'])
-        else: st.info("Kayit yok.")
-    elif st.session_state['page'] == "Yeni Hasta Ekle": analysis_form()
+        # Hasta seçilmemişse arama motorunu göster
+        if not st.session_state['editing_patient']:
+            search = st.text_input("", placeholder="Hasta Ara...")
+            data = pd.DataFrame(patient_sheet.get_all_records())
+            my_p = data[data['sahip'] == st.session_state['user']]
+            if not my_p.empty:
+                filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
+                for _, row in filt.iterrows():
+                    if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True):
+                        st.session_state['editing_patient'] = row.to_dict(); st.rerun()
+            else: st.info("Kayit yok.")
+        
+        # Hasta seçilmişse sadece onun analizini göster
+        else:
+            if st.button("Kapat", type="primary"): 
+                st.session_state['editing_patient'] = None; st.rerun()
+            analysis_form(st.session_state['editing_patient'])
+            
+    elif st.session_state['page'] == "Yeni Hasta Ekle": 
+        analysis_form()
 
 st.markdown('<div class="footer">Kerem Birgul</div>', unsafe_allow_html=True)
