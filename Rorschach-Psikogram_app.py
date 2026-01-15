@@ -64,19 +64,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Otomatik büyüme için yükseklik hesaplayıcı
+def get_auto_height(text, min_h=68):
+    if not text: return min_h
+    lines = text.count('\n') + 1
+    return max(min_h, lines * 28)
+
 if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now().timestamp()
 
-# Dinamik Yükseklik Fonksiyonu
-def get_height(text):
-    if not text: return 68
-    lines = text.count('\n') + 1
-    return max(68, lines * 25)
-
-# --- 4. WORD RAPOR (GRUP 4 VE SIRALAMA DÜZELTİLDİ) ---
+# --- 4. WORD RAPOR (Grup 4 ve Düzenli Sıralama) ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
@@ -98,16 +98,13 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
     
     doc.add_heading('Kod Frekanslari', level=2)
-    # Gruplara göre sıralı raporlama
     for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3), ("Ozel Kodlar", GRUP_4)]:
-        g_kodlari = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
-        if g_kodlari:
-            doc.add_paragraph(f"{g_n}: " + " | ".join(g_kodlari))
+        kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
+        if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
     
-    digerleri = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
-    if digerleri:
-        doc.add_paragraph("Diger Kodlar: " + " | ".join(digerleri))
-        
+    diger_k = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
+    if diger_k: doc.add_paragraph("Diger Kodlar: " + " | ".join(diger_k))
+    
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 5. ANALIZ FORMU ---
@@ -125,7 +122,10 @@ def analysis_form(edit_data=None):
     else: default_date = datetime.now().date()
     h_tarih = c_info3.date_input("Test Uygulama Tarihi", value=default_date, format="DD/MM/YYYY", key=f"date_{f_id}")
     tarih_str = h_tarih.strftime("%d/%m/%Y")
-    h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100, key=f"comment_{f_id}")
+    
+    # Dinamik Klinik Yorum Kutusu
+    y_comm = edit_data.get('klinik_yorum', "") if edit_data else ""
+    h_yorum = st.text_area("Klinik Yorumlar", value=y_comm, height=get_auto_height(y_comm, 100), key=f"comment_{f_id}")
 
     st.divider(); st.subheader("Kart Tercihleri")
     def box_selector(label, key_prefix, saved_val):
@@ -143,9 +143,12 @@ def analysis_form(edit_data=None):
         return st.session_state[state_key]
 
     b_cards = box_selector("En Begendigi Kartlar", "best", edit_data.get('en_begendigi', "[]") if edit_data else "[]")
-    b_reason = st.text_area("Begenme Nedeni", value=edit_data.get('en_begendigi_neden', "") if edit_data else "", height=get_height(edit_data.get('en_begendigi_neden', "") if edit_data else ""), key=f"br_{f_id}")
+    b_r_txt = edit_data.get('en_begendigi_neden', "") if edit_data else ""
+    b_reason = st.text_area("Begenme Nedeni", value=b_r_txt, height=get_auto_height(b_r_txt), key=f"br_{f_id}")
+    
     w_cards = box_selector("En Begenmedigi Kartlar", "worst", edit_data.get('en_beğenmediği', "[]") if edit_data else "[]")
-    w_reason = st.text_area("Begenmeme Nedeni", value=edit_data.get('en_beğenmediği_neden', "") if edit_data else "", height=get_height(edit_data.get('en_beğenmediği_neden', "") if edit_data else ""), key=f"wr_{f_id}")
+    w_r_txt = edit_data.get('en_beğenmediği_neden', "") if edit_data else ""
+    w_reason = st.text_area("Begenmeme Nedeni", value=w_r_txt, height=get_auto_height(w_r_txt), key=f"wr_{f_id}")
 
     st.divider()
     protokol_verileri = []
@@ -155,12 +158,13 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        y_val = saved_p[i-1].get('yanit','')
-        a_val = saved_p[i-1].get('anket','')
-        k_val = saved_p[i-1].get('kodlar','')
-        y = col1.text_area("Yanit", key=f"y_{i}_{f_id}", value=y_val, height=get_height(y_val))
-        a = col2.text_area("Anket", key=f"a_{i}_{f_id}", value=a_val, height=get_height(a_val))
-        k = st.text_area("Kodlar", key=f"k_{i}_{f_id}", value=k_val, height=get_height(k_val))
+        y_txt = saved_p[i-1].get('yanit','')
+        a_txt = saved_p[i-1].get('anket','')
+        k_txt = saved_p[i-1].get('kodlar','')
+        
+        y = col1.text_area("Yanit", key=f"y_{i}_{f_id}", value=y_txt, height=get_auto_height(y_txt))
+        a = col2.text_area("Anket", key=f"a_{i}_{f_id}", value=a_txt, height=get_auto_height(a_txt))
+        k = st.text_area("Kodlar", key=f"k_{i}_{f_id}", value=k_txt, height=get_auto_height(k_txt))
         st.markdown('</div>', unsafe_allow_html=True)
         protokol_verileri.append({"yanit": y, "anket": a, "kodlar": k})
 
@@ -195,7 +199,7 @@ def analysis_form(edit_data=None):
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
             
-            st.subheader(f"Psikogram Analizi (R: {total_r})")
+            st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(7)
             m_cols[0].markdown(f'<div class="metric-container c-g"><div class="metric-label">%G</div><div class="metric-value">%{calc["%G"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container c-d"><div class="metric-label">%D</div><div class="metric-value">%{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -206,15 +210,12 @@ def analysis_form(edit_data=None):
             m_cols[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
             st.write("**Kod Frekanslari:**")
-            st.write(f"**Lokalizasyon:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_1 if counts[k] > 0]))
-            st.write(f"**Belirleyiciler:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_2 if counts[k] > 0]))
-            st.write(f"**Icerik:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_3 if counts[k] > 0]))
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3), ("Ozel Kodlar", GRUP_4)]:
+                kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
+                if kodlar: st.write(f"**{g_n}:** " + " | ".join(kodlar))
             
-            # Özel ve Diğer Kodlar
-            sp_codes = [f"{k}: {counts[k]}" for k in GRUP_4 if counts[k] > 0]
-            if sp_codes: st.write(" | ".join(sp_codes))
-            other_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
-            if other_codes: st.write("**Diger Kodlar:** " + " | ".join(other_codes))
+            d_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
+            if d_codes: st.write("**Diger Kodlar:** " + " | ".join(d_codes))
 
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
