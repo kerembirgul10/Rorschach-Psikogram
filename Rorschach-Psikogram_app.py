@@ -11,7 +11,6 @@ from datetime import datetime
 try:
     from docx import Document
     from docx.shared import Pt
-    from docx.enum.table import WD_TABLE_ALIGNMENT
 except ImportError:
     pass
 
@@ -62,13 +61,13 @@ if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarım"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. WORD RAPOR (GÜNCELLENDİ: TABLO EKLENDİ) ---
-def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol):
+# --- 4. WORD RAPOR (GÜNCELLENDİ: ELLE GİRİLEN TARİH EKLENDİ) ---
+def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
     
     doc.add_heading('Hasta Bilgileri', level=1)
-    doc.add_paragraph(f"Yaş: {h_info['age']}\nTarih: {h_info['date']}")
+    doc.add_paragraph(f"Yaş: {h_info['age']}\nUygulama Tarihi: {selected_date}")
     
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
@@ -77,41 +76,46 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_paragraph(f"Beğenilen: {b_cards} (Nedeni: {b_reason})")
     doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Nedeni: {w_reason})")
 
-    # TABLO BURAYA EKLENDİ
     doc.add_heading('Test Protokolü (Yanıtlar, Anketler ve Kodlar)', level=1)
-    table = doc.add_table(rows=1, cols=4)
-    table.style = 'Table Grid'
+    table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = 'Kart'
-    hdr_cells[1].text = 'Yanıt'
-    hdr_cells[2].text = 'Anket'
-    hdr_cells[3].text = 'Kodlar'
+    hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
 
     for i, p in enumerate(protokol, 1):
         row_cells = table.add_row().cells
-        row_cells[0].text = str(i)
-        row_cells[1].text = str(p.get('yanit', ''))
-        row_cells[2].text = str(p.get('anket', ''))
-        row_cells[3].text = str(p.get('kodlar', ''))
+        row_cells[0].text, row_cells[1].text = str(i), str(p.get('yanit', ''))
+        row_cells[2].text, row_cells[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
 
     doc.add_heading('Psikogram Analizi', level=1)
     doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
-    for k, v in calc.items():
-        doc.add_paragraph(f"{k}: %{v:.1f}")
+    for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
     
     doc.add_heading('Kod Frekansları', level=2)
     doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
 
-    bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 5. ANALİZ FORMU ---
 def analysis_form(edit_data=None):
     st.header(f"{'Düzenle' if edit_data else 'Yeni'} Hasta Protokolü")
-    c_info1, c_info2 = st.columns([3, 1])
+    
+    # Bilgi Giriş Alanı
+    c_info1, c_info2, c_info3 = st.columns([3, 1, 2])
     h_isim = c_info1.text_input("Hastanın Adı Soyadı", value=edit_data.get('hasta_adi', "") if edit_data else "")
     h_yas = c_info2.number_input("Yaş", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0)
+    
+    # Elle Tarih Seçimi
+    if edit_data and edit_data.get('tarih'):
+        try:
+            default_date = datetime.strptime(edit_data['tarih'], "%d/%m/%Y").date()
+        except:
+            default_date = datetime.now().date()
+    else:
+        default_date = datetime.now().date()
+        
+    h_tarih = c_info3.date_input("Test Uygulama Tarihi", value=default_date, format="DD/MM/YYYY")
+    tarih_str = h_tarih.strftime("%d/%m/%Y")
+
     h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100)
 
     st.divider(); st.subheader("Kart Tercihleri")
@@ -152,12 +156,11 @@ def analysis_form(edit_data=None):
     calc_clicked = btn_col2.button("Psikogramı Hesapla")
 
     if save_clicked or calc_clicked:
-        tarih = datetime.now().strftime("%d/%m/%Y %H:%M")
-        new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(protokol_verileri), tarih, b_reason, w_reason]
+        new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(protokol_verileri), tarih_str, b_reason, w_reason]
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
-        st.success("Kaydedildi.")
+        st.success(f"Veriler {tarih_str} tarihiyle kaydedildi.")
 
     if calc_clicked:
         total_r = 0; r_8910 = 0; all_codes = []
@@ -176,7 +179,7 @@ def analysis_form(edit_data=None):
             calc = {"%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100, "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100, "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100}
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
-
+            
             st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(4)
             m_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -188,14 +191,13 @@ def analysis_form(edit_data=None):
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3)]:
                 st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
 
-            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri)
+            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("📄 Word İndir", report, f"{h_isim}_Rorschach.docx")
 
 # --- 6. NAVİGASYON ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
-    u = st.text_input("Kullanıcı")
-    p = st.text_input("Şifre", type="password")
+    u = st.text_input("Kullanıcı"); p = st.text_input("Şifre", type="password")
     if st.button("Giriş"):
         df = pd.DataFrame(user_sheet.get_all_records())
         if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
