@@ -302,9 +302,10 @@ else:
             
     with c_nav2:
         t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
-        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): 
-            st.session_state['page'] = "Yeni Hasta Ekle"
-            st.session_state['editing_patient'] = None
+       elif st.session_state['page'] == "Yeni Hasta Ekle": 
+        # Yeni hasta eklerken formu tertemiz açar
+        st.session_state['editing_patient'] = None
+        analysis_form()
             # Formu sıfırlamak için yeni bir ID atıyoruz
             st.session_state['form_id'] = datetime.now().timestamp()
             st.rerun()
