@@ -47,75 +47,66 @@ st.markdown("""
     .metric-label { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
     .metric-value { font-size: 24px; font-weight: 900; }
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
-    .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
+    .bg-yesil { background-color: #2ECC71 !important; border: 2px solid #27AE60 !important; color: white !important; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
     .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
     .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
+    
+    /* Streamlit buton renklerini yeşile çekmek için müdahale */
+    button[kind="primary"] {
+        background-color: #2ECC71 !important;
+        color: white !important;
+        border: none !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'user' not in st.session_state: st.session_state['user'] = ""
-if 'page' not in st.session_state: st.session_state['page'] = "Hastalarım"
+if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. WORD RAPOR (GÜNCELLENDİ: ELLE GİRİLEN TARİH EKLENDİ) ---
+# --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
-    
     doc.add_heading('Hasta Bilgileri', level=1)
-    doc.add_paragraph(f"Yaş: {h_info['age']}\nUygulama Tarihi: {selected_date}")
-    
+    doc.add_paragraph(f"Yas: {h_info['age']}\nUygulama Tarihi: {selected_date}")
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
-    
     doc.add_heading('Kart Tercihleri', level=1)
-    doc.add_paragraph(f"Beğenilen: {b_cards} (Nedeni: {b_reason})")
-    doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Nedeni: {w_reason})")
-
-    doc.add_heading('Test Protokolü (Yanıtlar, Anketler ve Kodlar)', level=1)
+    doc.add_paragraph(f"Begendigi: {b_cards} (Nedeni: {b_reason})")
+    doc.add_paragraph(f"Begenmedigi: {w_cards} (Nedeni: {w_reason})")
+    doc.add_heading('Test Protokolu (Yanitlar, Anketler ve Kodlar)', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
-
+    hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text = 'Kart', 'Yanit', 'Anket', 'Kodlar'
     for i, p in enumerate(protokol, 1):
         row_cells = table.add_row().cells
         row_cells[0].text, row_cells[1].text = str(i), str(p.get('yanit', ''))
         row_cells[2].text, row_cells[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
-
     doc.add_heading('Psikogram Analizi', level=1)
-    doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+    doc.add_paragraph(f"Toplam Yanit Sayisi (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
-    
-    doc.add_heading('Kod Frekansları', level=2)
+    doc.add_heading('Kod Frekanslari', level=2)
     doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
-
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
-# --- 5. ANALİZ FORMU ---
+# --- 5. ANALIZ FORMU ---
 def analysis_form(edit_data=None):
-    st.header(f"{'Düzenle' if edit_data else 'Yeni'} Hasta Protokolü")
-    
-    # Bilgi Giriş Alanı
+    st.header(f"{'Duzenle' if edit_data else 'Yeni'} Hasta Protokolu")
     c_info1, c_info2, c_info3 = st.columns([3, 1, 2])
-    h_isim = c_info1.text_input("Hastanın Adı Soyadı", value=edit_data.get('hasta_adi', "") if edit_data else "")
-    h_yas = c_info2.number_input("Yaş", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0)
+    h_isim = c_info1.text_input("Hastanin Adi Soyadi", value=edit_data.get('hasta_adi', "") if edit_data else "")
+    h_yas = c_info2.number_input("Yas", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0)
     
-    # Elle Tarih Seçimi
     if edit_data and edit_data.get('tarih'):
-        try:
-            default_date = datetime.strptime(edit_data['tarih'], "%d/%m/%Y").date()
-        except:
-            default_date = datetime.now().date()
-    else:
-        default_date = datetime.now().date()
-        
+        try: default_date = datetime.strptime(edit_data['tarih'], "%d/%m/%Y").date()
+        except: default_date = datetime.now().date()
+    else: default_date = datetime.now().date()
     h_tarih = c_info3.date_input("Test Uygulama Tarihi", value=default_date, format="DD/MM/YYYY")
     tarih_str = h_tarih.strftime("%d/%m/%Y")
-
     h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100)
 
     st.divider(); st.subheader("Kart Tercihleri")
@@ -132,10 +123,10 @@ def analysis_form(edit_data=None):
                 st.rerun()
         return st.session_state[f"{key_prefix}_list"]
 
-    b_cards = box_selector("En Beğendiği Kartlar", "best", edit_data.get('en_begendigi', "[]") if edit_data else "[]")
-    b_reason = st.text_area("Beğenme Nedeni", value=edit_data.get('en_begendigi_neden', "") if edit_data else "")
-    w_cards = box_selector("En Beğenmediği Kartlar", "worst", edit_data.get('en_beğenmediği', "[]") if edit_data else "[]")
-    w_reason = st.text_area("Beğenmeme Nedeni", value=edit_data.get('en_beğenmediği_neden', "") if edit_data else "")
+    b_cards = box_selector("En Begendigi Kartlar", "best", edit_data.get('en_begendigi', "[]") if edit_data else "[]")
+    b_reason = st.text_area("Begenme Nedeni", value=edit_data.get('en_begendigi_neden', "") if edit_data else "")
+    w_cards = box_selector("En Begenmedigi Kartlar", "worst", edit_data.get('en_beğenmediği', "[]") if edit_data else "[]")
+    w_reason = st.text_area("Begenmeme Nedeni", value=edit_data.get('en_beğenmediği_neden', "") if edit_data else "")
 
     st.divider()
     protokol_verileri = []
@@ -145,7 +136,7 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        y = col1.text_area("Yanıt", key=f"y_{i}", value=saved_p[i-1].get('yanit',''))
+        y = col1.text_area("Yanit", key=f"y_{i}", value=saved_p[i-1].get('yanit',''))
         a = col2.text_area("Anket", key=f"a_{i}", value=saved_p[i-1].get('anket',''))
         k = st.text_area("Kodlar", key=f"k_{i}", value=saved_p[i-1].get('kodlar',''))
         st.markdown('</div>', unsafe_allow_html=True)
@@ -153,7 +144,7 @@ def analysis_form(edit_data=None):
 
     btn_col1, btn_col2 = st.columns(2)
     save_clicked = btn_col1.button("Sadece Kaydet")
-    calc_clicked = btn_col2.button("Psikogramı Hesapla")
+    calc_clicked = btn_col2.button("Psikogrami Hesapla")
 
     if save_clicked or calc_clicked:
         new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(protokol_verileri), tarih_str, b_reason, w_reason]
@@ -173,49 +164,45 @@ def analysis_form(edit_data=None):
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
                     for code in line.replace(",", " ").split(): all_codes.append(code)
-        
         if total_r > 0:
             counts = Counter(all_codes)
             calc = {"%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100, "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100, "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100}
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
-            
             st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(4)
             m_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[3].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
-
-            st.write("**Grup Kod Dağılımı:**")
-            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3)]:
+            st.write("**Grup Kod Dagilimi:**")
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
                 st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
-
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
-            st.download_button("📄 Word İndir", report, f"{h_isim}_Rorschach.docx")
+            st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
 
-# --- 6. NAVİGASYON ---
+# --- 6. NAVIGASYON ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
-    u = st.text_input("Kullanıcı"); p = st.text_input("Şifre", type="password")
-    if st.button("Giriş"):
+    u = st.text_input("Kullanici"); p = st.text_input("Sifre", type="password")
+    if st.button("Giris"):
         df = pd.DataFrame(user_sheet.get_all_records())
         if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
             st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
 else:
     c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
-    with c_user: st.markdown(f"#### 👤 {st.session_state['user']}")
+    with c_user: st.markdown(f"#### {st.session_state['user']}")
     with c_nav1:
-        t_h = "primary" if st.session_state['page'] == "Hastalarım" else "secondary"
-        if st.button("📁 Hastalarım", use_container_width=True, type=t_h): st.session_state['page'] = "Hastalarım"; st.rerun()
+        t_h = "primary" if st.session_state['page'] == "Hastalarim" else "secondary"
+        if st.button("Hastalarim", use_container_width=True, type=t_h): st.session_state['page'] = "Hastalarim"; st.rerun()
     with c_nav2:
         t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
-        if st.button("➕ Yeni Hasta Ekle", use_container_width=True, type=t_y): st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
+        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
     with c_out:
-        if st.button("Çıkış", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
+        if st.button("Cikis", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
     st.divider()
 
-    if st.session_state['page'] == "Hastalarım":
+    if st.session_state['page'] == "Hastalarim":
         search = st.text_input("", placeholder="Hasta Ara...")
         data = pd.DataFrame(patient_sheet.get_all_records())
         my_p = data[data['sahip'] == st.session_state['user']]
@@ -227,9 +214,9 @@ else:
                     st.session_state['editing_patient'] = row.to_dict(); st.rerun()
             if st.session_state['editing_patient']:
                 st.divider()
-                if st.button("❌ Kapat"): st.session_state['editing_patient'] = None; st.rerun()
+                if st.button("Kapat"): st.session_state['editing_patient'] = None; st.rerun()
                 analysis_form(st.session_state['editing_patient'])
-        else: st.info("Kayıt yok.")
+        else: st.info("Kayit yok.")
     elif st.session_state['page'] == "Yeni Hasta Ekle": analysis_form()
 
-st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">Kerem Birgul</div>', unsafe_allow_html=True)
