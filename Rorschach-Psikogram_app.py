@@ -36,7 +36,6 @@ except Exception as e:
 
 # --- 3. TASARIM ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
-
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
@@ -61,18 +60,33 @@ if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarım"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. WORD RAPOR ---
-def create_word_report(h_info, calc, counts, protokol, total_r, b_cards, w_cards, b_reason, w_reason):
+# --- 4. WORD RAPOR (GÜNCELLENDİ: TABLO KALDIRILDI) ---
+def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason):
     doc = Document()
-    doc.add_heading('Rorschach Klinik Analiz Raporu', 0)
+    # Başlık hastanın ismi yapıldı
+    doc.add_heading(h_info['name'], 0)
+    
     doc.add_heading('Hasta Bilgileri', level=1)
-    doc.add_paragraph(f"Ad Soyad: {h_info['name']}\nYaş: {h_info['age']}\nTarih: {h_info['date']}")
+    doc.add_paragraph(f"Yaş: {h_info['age']}\nTarih: {h_info['date']}")
+    
+    doc.add_heading('Klinik Yorumlar', level=2)
+    doc.add_paragraph(h_info['comment'])
+    
     doc.add_heading('Kart Tercihleri', level=1)
-    doc.add_paragraph(f"Beğenilen: {b_cards} (Neden: {b_reason})")
-    doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Neden: {w_reason})")
-    doc.add_heading('Psikogram', level=1)
-    for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
-    bio = BytesIO(); doc.save(bio); return bio.getvalue()
+    doc.add_paragraph(f"Beğenilen: {b_cards} (Nedeni: {b_reason})")
+    doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Nedeni: {w_reason})")
+
+    doc.add_heading('Psikogram Analizi', level=1)
+    doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+    for k, v in calc.items():
+        doc.add_paragraph(f"{k}: %{v:.1f}")
+    
+    doc.add_heading('Kod Frekansları', level=2)
+    doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
+
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
 
 # --- 5. ANALİZ FORMU ---
 def analysis_form(edit_data=None):
@@ -82,8 +96,8 @@ def analysis_form(edit_data=None):
     h_yas = c_info2.number_input("Yaş", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0)
     h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100)
 
-    st.divider()
-    st.subheader("Kart Tercihleri")
+    st.divider(); st.subheader("Kart Tercihleri")
+    
     def box_selector(label, key_prefix, saved_val):
         st.write(label)
         saved_list = json.loads(saved_val) if saved_val else []
@@ -145,13 +159,20 @@ def analysis_form(edit_data=None):
             calc = {"%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100, "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100, "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100}
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
+
             st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(4)
             m_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[3].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
-            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, protokol_verileri, total_r, b_cards, w_cards, b_reason, w_reason)
+
+            # GRUP KOD FREKANSLARI (PSİKOGRAM ALTINA EKLENDİ)
+            st.write("**Grup Kod Dağılımı:**")
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3)]:
+                st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
+
+            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason)
             st.download_button("📄 Word İndir", report, f"{h_isim}_Rorschach.docx")
 
 # --- 6. NAVİGASYON ---
@@ -164,21 +185,16 @@ if not st.session_state['logged_in']:
         if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
             st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
 else:
-    # Üst Menü
     c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
     with c_user: st.markdown(f"#### 👤 {st.session_state['user']}")
     with c_nav1:
-        type_h = "primary" if st.session_state['page'] == "Hastalarım" else "secondary"
-        if st.button("📁 Hastalarım", use_container_width=True, type=type_h):
-            st.session_state['page'] = "Hastalarım"; st.rerun()
+        t_h = "primary" if st.session_state['page'] == "Hastalarım" else "secondary"
+        if st.button("📁 Hastalarım", use_container_width=True, type=t_h): st.session_state['page'] = "Hastalarım"; st.rerun()
     with c_nav2:
-        type_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
-        if st.button("➕ Yeni Hasta Ekle", use_container_width=True, type=type_y):
-            st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
+        t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
+        if st.button("➕ Yeni Hasta Ekle", use_container_width=True, type=t_y): st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
     with c_out:
-        if st.button("Çıkış", use_container_width=True):
-            st.session_state['logged_in'] = False; st.rerun()
-
+        if st.button("Çıkış", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
     st.divider()
 
     if st.session_state['page'] == "Hastalarım":
@@ -186,18 +202,8 @@ else:
         data = pd.DataFrame(patient_sheet.get_all_records())
         my_p = data[data['sahip'] == st.session_state['user']]
         if not my_p.empty:
-            filtered = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
-            for _, row in filtered.iterrows():
-                # Aktif seçili hasta yeşil görünsün
-                is_active = st.session_state['editing_patient'] and st.session_state['editing_patient']['hasta_adi'] == row['hasta_adi']
-                if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True, type="primary" if is_active else "secondary"):
-                    st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-            if st.session_state['editing_patient']:
-                st.divider()
-                if st.button("❌ Kapat"): st.session_state['editing_patient'] = None; st.rerun()
-                analysis_form(st.session_state['editing_patient'])
-        else: st.info("Kayıt yok.")
-    elif st.session_state['page'] == "Yeni Hasta Ekle":
-        analysis_form()
-
-st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
+            filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
+            for _, row in filt.iterrows():
+                act = st.session_state['editing_patient'] and st.session_state['editing_patient']['hasta_adi'] == row['hasta_adi']
+                if st.button(row['hasta_
+                            
