@@ -111,6 +111,10 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
         kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
         if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
     
+    digerleri = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
+    if digerleri:
+        doc.add_paragraph("Diğer Kodlar: " + " | ".join(digerleri))
+    
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 5. ANALIZ FORMU ---
@@ -201,6 +205,14 @@ def analysis_form(edit_data=None):
             m[5].markdown(f'<div class="metric-container c-tri"><div class="metric-label">TRI</div><div class="metric-value">%{calc["TRI"]:.0f}</div></div>', unsafe_allow_html=True)
             m[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
+            # --- EKRANA KOD SAYILARINI YAZDIRMA (İSTEDİĞİN YER) ---
+            st.write("**Kod Frekansları:**")
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
+                kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
+                if kodlar: st.write(f"**{g_n}:** " + " | ".join(kodlar))
+            d_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
+            if d_codes: st.write("**Diğer Kodlar:** " + " | ".join(d_codes))
+
             rep = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word İndir", rep, f"{h_isim}_Rorschach.docx")
 
@@ -226,7 +238,7 @@ else:
     with c_u: st.markdown(f"#### {st.session_state['user']}")
     with c_n1:
         if st.button("Hastalarım", use_container_width=True, type="primary" if st.session_state['page']=="Hastalarim" else "secondary"):
-            st.session_state['page'] = "Hastalarim"; st.rerun()
+            st.session_state['page'] = "Hastalarim"; st.session_state['editing_patient'] = None; st.rerun()
     with c_n2:
         if st.button("Yeni Hasta Ekle", use_container_width=True, type="primary" if st.session_state['page']=="Yeni Hasta Ekle" else "secondary"):
             st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None
@@ -250,8 +262,6 @@ else:
                     r1, r2, r3 = st.columns([3, 1, 1])
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-                    
-                    # Hızlı Word Hazırlama
                     try:
                         p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
                         for idx, d in enumerate(p_v, 1):
@@ -265,7 +275,6 @@ else:
                         rep_bio = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, Counter(all_c), t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
                         r2.download_button("📄 İndir", rep_bio, f"{row['hasta_adi']}.docx", key=f"dl_{_}")
                     except: r2.write("Hata")
-                    
                     if r3.button("🗑️ Sil", key=f"d_{_}"):
                         cell = patient_sheet.find(row['hasta_adi']); patient_sheet.delete_rows(cell.row); st.rerun()
             else: st.info("Kayıt yok.")
