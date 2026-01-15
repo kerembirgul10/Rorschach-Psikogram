@@ -93,7 +93,61 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     diag_codes = [f"{k}: {v}" for k, v in counts.items() if v > 0]
     doc.add_paragraph(", ".join(diag_codes))
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
+# --- WORD RAPOR GÜNCELLEME ---
+def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
+    doc = Document()
+    doc.add_heading(h_info['name'], 0)
+    
+    # Hasta Bilgileri
+    doc.add_heading('Hasta Bilgileri', level=1)
+    doc.add_paragraph(f"Yaş: {h_info['age']}\nUygulama Tarihi: {selected_date}")
+    
+    # Klinik Yorumlar
+    doc.add_heading('Klinik Yorumlar', level=2)
+    doc.add_paragraph(h_info['comment'])
+    
+    # Test Protokolü Tablosu
+    doc.add_heading('Test Protokolü', level=1)
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    hdr = table.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
+    for i, p in enumerate(protokol, 1):
+        row = table.add_row().cells
+        row[0].text = str(i)
+        row[1].text = str(p.get('yanit', ''))
+        row[2].text = str(p.get('anket', ''))
+        row[3].text = str(p.get('kodlar', ''))
 
+    # Psikogram Analizi
+    doc.add_heading('Psikogram Analizi', level=1)
+    for k, v in calc.items():
+        doc.add_paragraph(f"{k}: %{v:.1f}")
+
+    # GRUPLANMIŞ KOD FREKANSLARI (İstediğiniz Sırayla)
+    doc.add_heading('Kod Frekansları (Gruplandırılmış)', level=2)
+    
+    gruplar = [
+        ("Lokalizasyon", GRUP_1),
+        ("Belirleyiciler", GRUP_2),
+        ("İçerik", GRUP_3),
+        ("Özel Kodlar (Grup 4)", GRUP_4)
+    ]
+
+    for grup_adi, grup_liste in gruplar:
+        # Sadece o grupta olan ve puanlanmış kodları filtrele
+        grup_kodlari = [f"{k}: {counts[k]}" for k in grup_liste if counts[k] > 0]
+        if grup_kodlari:
+            doc.add_paragraph(f"**{grup_adi}:** " + " | ".join(grup_kodlari))
+
+    # Gruplarda olmayan diğer kodlar varsa en sona ekle
+    diger_kodlar = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
+    if diger_kodlar:
+        doc.add_paragraph("**Diğer Kodlar:** " + " | ".join(diger_kodlar))
+
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
 # --- 5. ANALIZ FORMU ---
 def analysis_form(edit_data=None):
     # Form_id her 'Yeni Hasta' denildiğinde değişeceği için kutular sıfırlanır
