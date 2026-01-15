@@ -205,5 +205,13 @@ else:
             filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
             for _, row in filt.iterrows():
                 act = st.session_state['editing_patient'] and st.session_state['editing_patient']['hasta_adi'] == row['hasta_adi']
-                if st.button(row['hasta_
-                            
+                if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True, type="primary" if act else "secondary"):
+                    st.session_state['editing_patient'] = row.to_dict(); st.rerun()
+            if st.session_state['editing_patient']:
+                st.divider()
+                if st.button("❌ Kapat"): st.session_state['editing_patient'] = None; st.rerun()
+                analysis_form(st.session_state['editing_patient'])
+        else: st.info("Kayıt yok.")
+    elif st.session_state['page'] == "Yeni Hasta Ekle": analysis_form()
+
+st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
