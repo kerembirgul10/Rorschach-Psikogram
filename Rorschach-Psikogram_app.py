@@ -264,3 +264,43 @@ else:
         analysis_form()
 
 st.markdown('<div class="footer">Kerem Birgul</div>', unsafe_allow_html=True)
+# --- 6. NAVIGASYON VE GIRIS EKRANI ---
+if not st.session_state['logged_in']:
+    st.title("Rorschach Klinik Panel")
+    
+    # Giriş ve Kayıt sekmelerini burada oluşturuyoruz
+    t1, t2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
+    
+    with t1:
+        u = st.text_input("Kullanıcı Adı", key="login_u")
+        p = st.text_input("Şifre", type="password", key="login_p")
+        if st.button("Sisteme Giriş"):
+            df = pd.DataFrame(user_sheet.get_all_records())
+            df.columns = df.columns.str.strip()
+            if u in df['kullanici_adi'].values:
+                if str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
+                    st.session_state['logged_in'] = True
+                    st.session_state['user'] = u
+                    st.rerun()
+                else:
+                    st.error("Hatalı şifre.")
+            else:
+                st.error("Kullanıcı bulunamadı.")
+                
+    with t2:
+        st.subheader("Yeni Hesap Oluştur")
+        nu = st.text_input("Yeni Kullanıcı Adı", key="reg_u")
+        np = st.text_input("Şifre Belirle", type="password", key="reg_p")
+        nn = st.text_input("Ad Soyad", key="reg_n")
+        
+        if st.button("Kayıt Ol"):
+            if nu and np and nn:
+                user_sheet.append_row([nu, str(np), nn])
+                st.success("Kaydınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.")
+            else:
+                st.warning("Lütfen tüm alanları doldurun.")
+
+else:
+    # Buradan sonrası mevcut giriş yapmış kullanıcı menüsü (Üst Menü) devam eder...
+    c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
+    # ... (Önceki yazdığımız navigasyon kodları buraya gelecek)
