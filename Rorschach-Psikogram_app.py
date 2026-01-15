@@ -16,7 +16,7 @@ except ImportError:
 
 # --- 1. GRUP TANIMLARI ---
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
-# Karakter uyumu için listeyi netleştiriyoruz
+# Karakter çakışmasını önlemek için listeyi normalize ediyoruz
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
 GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"]
@@ -43,7 +43,6 @@ st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
-    
     .metric-container {
         height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;
         border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
@@ -51,8 +50,6 @@ st.markdown("""
     }
     .metric-label { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
     .metric-value { font-size: 20px; font-weight: 900; }
-    
-    /* Psikogram Renkleri */
     .c-g { background-color: #FFD93D; border: 2px solid #E2B200; }
     .c-d { background-color: #FFB347; border: 2px solid #E67E22; }
     .c-f { background-color: #FF6B6B; border: 2px solid #D63031; }
@@ -60,12 +57,10 @@ st.markdown("""
     .c-h { background-color: #D1A3FF; border: 2px solid #8E44AD; }
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
-    
     .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
     .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
-    
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -83,7 +78,6 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_paragraph(f"Yas: {h_info['age']}\nUygulama Tarihi: {selected_date}")
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
-    
     doc.add_heading('Test Protokolu', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr = table.rows[0].cells
@@ -92,15 +86,11 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
         row = table.add_row().cells
         row[0].text, row[1].text = str(i), str(p.get('yanit', ''))
         row[2].text, row[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
-    
     doc.add_heading('Psikogram Analizi', level=1)
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
-    
     doc.add_heading('Kod Frekanslari', level=2)
-    # Tüm frekansları rapora yazıyoruz
     diag_codes = [f"{k}: {v}" for k, v in counts.items() if v > 0]
     doc.add_paragraph(", ".join(diag_codes))
-    
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 5. ANALIZ FORMU ---
@@ -160,22 +150,22 @@ def analysis_form(edit_data=None):
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
-        st.success(f"Kaydedildi: {tarih_str}")
+        st.success("Kaydedildi.") # SADECE KAYDEDİLDİ YAZIYOR
 
     if calc_clicked:
         total_r = 0; r_8910 = 0; all_codes = []
         for i, d in enumerate(protokol_verileri, 1):
             if d["kodlar"].strip():
-                # Hem enter hem noktalı virgül desteği
                 lines = d["kodlar"].replace(';', '\n').split('\n')
                 for line in lines:
                     line = line.strip()
                     if not line or line.lower() == "reddetme": continue
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
-                    # Kodları parçala ve temizle
                     for code in line.replace(",", " ").split(): 
-                        all_codes.append(code.strip())
+                        # Tırnak işareti normalleştirme (FC’ -> FC')
+                        clean_code = code.replace("’", "'").replace("‘", "'").strip()
+                        all_codes.append(clean_code)
         
         if total_r > 0:
             counts = Counter(all_codes)
@@ -194,22 +184,15 @@ def analysis_form(edit_data=None):
             m_cols[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
             st.write("**Kod Frekanslari:**")
-            # Lokalizasyon
             st.write(f"**Lokalizasyon:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_1 if counts[k] > 0]))
-            # Belirleyiciler
             st.write(f"**Belirleyiciler:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_2 if counts[k] > 0]))
-            # İçerik
             st.write(f"**Icerik:** " + " | ".join([f"{k}: {counts[k]}" for k in GRUP_3 if counts[k] > 0]))
             
-            # Özel Kodlar (Ban, Reddetme vb.)
             special_codes = [f"{k}: {counts[k]}" for k in GRUP_4 if counts[k] > 0]
-            if special_codes:
-                st.write(" | ".join(special_codes))
+            if special_codes: st.write(" | ".join(special_codes))
             
-            # Diğer Kodlar (Mimari vb.)
             other_codes = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR]
-            if other_codes:
-                st.write("**Diger Kodlar:** " + " | ".join(other_codes))
+            if other_codes: st.write("**Diger Kodlar:** " + " | ".join(other_codes))
 
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
