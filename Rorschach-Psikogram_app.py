@@ -79,33 +79,64 @@ if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now
 # --- 4. WORD RAPOR (Grup 4 ve Düzenli Sıralama) ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
     doc = Document()
+    # Başlık hastanın ismi
     doc.add_heading(h_info['name'], 0)
+    
     doc.add_heading('Hasta Bilgileri', level=1)
-    doc.add_paragraph(f"Yas: {h_info['age']}\nUygulama Tarihi: {selected_date}")
+    doc.add_paragraph(f"Yaş: {h_info['age']}\nUygulama Tarihi: {selected_date}")
+    
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
     
-    doc.add_heading('Test Protokolu', level=1)
-    table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
-    hdr = table.rows[0].cells
-    hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanit', 'Anket', 'Kodlar'
+    # --- KART TERCİHLERİ BÖLÜMÜ (BURASI EKLENDİ) ---
+    doc.add_heading('Kart Tercihleri', level=1)
+    
+    # Beğenilen Kartlar
+    b_list = str(b_cards).replace('[', '').replace(']', '')
+    doc.add_heading('En Beğendiği Kartlar:', level=2)
+    doc.add_paragraph(f"Kart Numaraları: {b_list}")
+    doc.add_paragraph(f"Beğenme Nedeni: {b_reason}")
+    
+    # Beğenilmeyen Kartlar
+    w_list = str(w_cards).replace('[', '').replace(']', '')
+    doc.add_heading('En Beğenmediği Kartlar:', level=2)
+    doc.add_paragraph(f"Kart Numaraları: {w_list}")
+    doc.add_paragraph(f"Beğenmeme Nedeni: {w_reason}")
+    # ----------------------------------------------
+
+    doc.add_heading('Test Protokolü (Yanıtlar, Anketler ve Kodlar)', level=1)
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Kart'; hdr_cells[1].text = 'Yanıt'
+    hdr_cells[2].text = 'Anket'; hdr_cells[3].text = 'Kodlar'
+
     for i, p in enumerate(protokol, 1):
-        row = table.add_row().cells
-        row[0].text, row[1].text = str(i), str(p.get('yanit', ''))
-        row[2].text, row[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
-    
+        row_cells = table.add_row().cells
+        row_cells[0].text = str(i)
+        row_cells[1].text = str(p.get('yanit', ''))
+        row_cells[2].text = str(p.get('anket', ''))
+        row_cells[3].text = str(p.get('kodlar', ''))
+
     doc.add_heading('Psikogram Analizi', level=1)
-    for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
+    doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+    for k, v in calc.items():
+        doc.add_paragraph(f"{k}: %{v:.1f}")
     
-    doc.add_heading('Kod Frekanslari', level=2)
-    for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3), ("Ozel Kodlar", GRUP_4)]:
-        kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
-        if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
+    doc.add_heading('Kod Frekansları', level=2)
+    # Gruplara göre sıralı raporlama
+    for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
+        g_kodlari = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
+        if g_kodlari:
+            doc.add_paragraph(f"{g_n}: " + " | ".join(g_kodlari))
     
-    diger_k = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
-    if diger_k: doc.add_paragraph("Diger Kodlar: " + " | ".join(diger_k))
-    
-    bio = BytesIO(); doc.save(bio); return bio.getvalue()
+    digerleri = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
+    if digerleri:
+        doc.add_paragraph("Diğer Kodlar: " + " | ".join(digerleri))
+
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
 
 # --- 5. ANALIZ FORMU ---
 def analysis_form(edit_data=None):
