@@ -34,21 +34,11 @@ except Exception as e:
     st.error(f"Bağlantı hatası: {e}")
     st.stop()
 
-# --- 3. TASARIM VE ÜST MENÜ STİLİ ---
+# --- 3. TASARIM ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 
 st.markdown("""
     <style>
-    /* Üst Menü Tasarımı */
-    .nav-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 20px;
-        background-color: #f8f9fa;
-        border-bottom: 2px solid #e9ecef;
-        margin-bottom: 30px;
-    }
     textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
     .metric-container {
         height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -62,8 +52,6 @@ st.markdown("""
     .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
     .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
-    
-    /* Standart Streamlit sidebar'ı gizle */
     [data-testid="stSidebar"] { display: none; }
     </style>
 """, unsafe_allow_html=True)
@@ -73,19 +61,16 @@ if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarım"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. WORD RAPOR OLUŞTURUCU ---
+# --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, protokol, total_r, b_cards, w_cards, b_reason, w_reason):
     doc = Document()
     doc.add_heading('Rorschach Klinik Analiz Raporu', 0)
     doc.add_heading('Hasta Bilgileri', level=1)
     doc.add_paragraph(f"Ad Soyad: {h_info['name']}\nYaş: {h_info['age']}\nTarih: {h_info['date']}")
-    doc.add_heading('Klinik Yorumlar', level=2)
-    doc.add_paragraph(h_info['comment'])
     doc.add_heading('Kart Tercihleri', level=1)
-    doc.add_paragraph(f"Beğenilen: {b_cards} (Nedeni: {b_reason})")
-    doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Nedeni: {w_reason})")
+    doc.add_paragraph(f"Beğenilen: {b_cards} (Neden: {b_reason})")
+    doc.add_paragraph(f"Beğenilmeyen: {w_cards} (Neden: {w_reason})")
     doc.add_heading('Psikogram', level=1)
-    doc.add_paragraph(f"Toplam Yanıt (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
@@ -99,7 +84,6 @@ def analysis_form(edit_data=None):
 
     st.divider()
     st.subheader("Kart Tercihleri")
-    
     def box_selector(label, key_prefix, saved_val):
         st.write(label)
         saved_list = json.loads(saved_val) if saved_val else []
@@ -170,7 +154,7 @@ def analysis_form(edit_data=None):
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, protokol_verileri, total_r, b_cards, w_cards, b_reason, w_reason)
             st.download_button("📄 Word İndir", report, f"{h_isim}_Rorschach.docx")
 
-# --- 6. NAVİGASYON VE OTURUM ---
+# --- 6. NAVİGASYON ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
     u = st.text_input("Kullanıcı")
@@ -180,31 +164,34 @@ if not st.session_state['logged_in']:
         if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
             st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
 else:
-    # Üst Menü Düzeni
-    c_user, c_nav, c_out = st.columns([1, 2, 1])
-    with c_user:
-        st.markdown(f"#### 👤 {st.session_state['user']}")
-    with c_nav:
-        nav_tab1, nav_tab2 = st.columns(2)
-        if nav_tab1.button("📁 Hastalarım", use_container_width=True):
+    # Üst Menü
+    c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
+    with c_user: st.markdown(f"#### 👤 {st.session_state['user']}")
+    with c_nav1:
+        type_h = "primary" if st.session_state['page'] == "Hastalarım" else "secondary"
+        if st.button("📁 Hastalarım", use_container_width=True, type=type_h):
             st.session_state['page'] = "Hastalarım"; st.rerun()
-        if nav_tab2.button("➕ Yeni Hasta Ekle", use_container_width=True):
+    with c_nav2:
+        type_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
+        if st.button("➕ Yeni Hasta Ekle", use_container_width=True, type=type_y):
             st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; st.rerun()
     with c_out:
-        if st.button("🔴 Çıkış", use_container_width=True):
+        if st.button("Çıkış", use_container_width=True):
             st.session_state['logged_in'] = False; st.rerun()
 
     st.divider()
 
     if st.session_state['page'] == "Hastalarım":
-        st.header("Hastalarım")
-        search = st.text_input("Hasta Ara...")
+        search = st.text_input("", placeholder="Hasta Ara...")
         data = pd.DataFrame(patient_sheet.get_all_records())
         my_p = data[data['sahip'] == st.session_state['user']]
         if not my_p.empty:
             filtered = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
             for _, row in filtered.iterrows():
-                if st.button(row['hasta_adi'], key=f"p_{_}"): st.session_state['editing_patient'] = row.to_dict()
+                # Aktif seçili hasta yeşil görünsün
+                is_active = st.session_state['editing_patient'] and st.session_state['editing_patient']['hasta_adi'] == row['hasta_adi']
+                if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True, type="primary" if is_active else "secondary"):
+                    st.session_state['editing_patient'] = row.to_dict(); st.rerun()
             if st.session_state['editing_patient']:
                 st.divider()
                 if st.button("❌ Kapat"): st.session_state['editing_patient'] = None; st.rerun()
