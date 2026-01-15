@@ -10,6 +10,8 @@ from datetime import datetime
 # WORD kütüphanesi
 try:
     from docx import Document
+    from docx.shared import Pt, Inches
+    from docx.enum.table import WD_TABLE_ALIGNMENT
 except ImportError:
     pass
 
@@ -20,7 +22,6 @@ try:
     creds = Credentials.from_service_account_info(creds_info, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Google Sheet Adı (Seninkine göre kontrol et!)
     SHEET_NAME = "Rorschach_Veritabani" 
     sheet = client.open(SHEET_NAME)
     user_sheet = sheet.worksheet("Kullanıcılar")
@@ -29,11 +30,11 @@ except Exception as e:
     st.error(f"Veritabanı bağlantı hatası: {e}")
     st.stop()
 
-# --- 2. TASARIM VE STİLLER ---
+# --- 2. TASARIM ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
-
 st.markdown("""
     <style>
+    textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
     .metric-container {
         height: 110px; display: flex; flex-direction: column;
         justify-content: center; align-items: center;
@@ -45,177 +46,183 @@ st.markdown("""
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
     .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
-    
-    .kart-wrapper {
-        padding: 20px; border-radius: 15px; margin-top: 10px; margin-bottom: 30px;
-        border: 1px solid rgba(0,0,0,0.1); box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-    }
-    .kart-title-top {
-        font-size: 20px; font-weight: 800; margin-bottom: 15px; color: #2c3e50;
-        border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 5px; display: block;
-    }
-    .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
+    .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
+    .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. OTURUM DURUMU ---
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
-if 'user' not in st.session_state:
-    st.session_state['user'] = ""
+if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
+if 'user' not in st.session_state: st.session_state['user'] = ""
+if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 
-# --- 4. GİRİŞ VE KAYIT SAYFASI ---
-def auth_page():
-    st.title("🧠 Rorschach Klinik Panel")
-    tab1, tab2 = st.tabs(["Giriş Yap", "Kayıt Ol"])
+# --- 4. ANALİZ VE WORD FONKSİYONU ---
+def create_word_report(h_info, calc_results, protokol_list, total_r):
+    doc = Document()
+    doc.add_heading('Rorschach Klinik Analiz Raporu', 0)
     
-    with tab1:
-        login_user = st.text_input("Kullanıcı Adı", key="l_user")
-        login_pw = st.text_input("Şifre", type="password", key="l_pw")
-        if st.button("Sisteme Giriş"):
-            data = user_sheet.get_all_records()
-            if data:
-                users_df = pd.DataFrame(data)
-                users_df.columns = users_df.columns.str.strip()
-                if login_user in users_df['kullanici_adi'].values:
-                    user_row = users_df[users_df['kullanici_adi'] == login_user]
-                    if str(login_pw) == str(user_row['sifre'].values[0]):
-                        st.session_state['logged_in'] = True
-                        st.session_state['user'] = login_user
-                        st.rerun()
-                    else: st.error("Hatalı şifre.")
-                else: st.error("Kullanıcı bulunamadı.")
-            else: st.error("Önce Kayıt Olun.")
+    # Hasta Bilgileri
+    doc.add_heading('1. Hasta Bilgileri', level=1)
+    doc.add_paragraph(f"Ad Soyad: {h_info['name']}\nYaş: {h_info['age']}\nTarih: {h_info['date']}")
+    doc.add_heading('Klinik Gözlem ve Yorumlar:', level=2)
+    doc.add_paragraph(h_info['comment'])
 
-    with tab2:
-        new_user = st.text_input("Kullanıcı Adı Belirle", key="r_user")
-        new_pw = st.text_input("Şifre Belirle", type="password", key="r_pw")
-        new_name = st.text_input("Adınız Soyadınız", key="r_name")
-        if st.button("Kayıt Ol"):
-            data = user_sheet.get_all_records()
-            users_df = pd.DataFrame(data) if data else pd.DataFrame(columns=['kullanici_adi', 'sifre', 'isim'])
-            if new_user in users_df['kullanici_adi'].values:
-                st.warning("Bu kullanıcı adı dolu.")
-            else:
-                user_sheet.append_row([new_user, str(new_pw), new_name])
-                st.success("Kayıt başarılı! Giriş yapabilirsiniz.")
+    # Protokol Tablosu
+    doc.add_heading('2. Test Protokolü (Yanıtlar ve Kodlar)', level=1)
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Kart'
+    hdr_cells[1].text = 'Yanıt'
+    hdr_cells[2].text = 'Anket'
+    hdr_cells[3].text = 'Kodlar'
 
-# --- 5. ANA PANEL VE ANALİZ FORMU ---
-def dashboard():
-    st.sidebar.title(f"👤 {st.session_state['user']}")
-    menu = st.sidebar.radio("Sayfalar", ["📁 Hastalarım", "➕ Yeni Hasta Ekle"])
-    if st.sidebar.button("Güvenli Çıkış"):
-        st.session_state['logged_in'] = False
-        st.rerun()
+    for i, p in enumerate(protokol_list, 1):
+        row_cells = table.add_row().cells
+        row_cells[0].text = str(i)
+        row_cells[1].text = p['yanit']
+        row_cells[2].text = p['anket']
+        row_cells[3].text = p['kodlar']
 
-    if menu == "📁 Hastalarım":
-        st.header("Kayıtlı Protokoller")
-        data = patient_sheet.get_all_records()
-        if data:
-            df = pd.DataFrame(data)
-            my_patients = df[df['sahip'] == st.session_state['user']]
-            if not my_patients.empty:
-                for idx, p in my_patients.iterrows():
-                    with st.expander(f"📄 {p['hasta_adi']} ({p['tarih']})"):
-                        st.write(f"**Yaş:** {p['yas']}")
-                        st.write(f"**Klinik Yorum:** {p['klinik_yorum']}")
-            else: st.info("Henüz bir protokol kaydetmediniz.")
-        else: st.info("Veritabanı boş.")
+    # Analiz Sonuçları
+    doc.add_heading('3. Psikogram Analiz Sonuçları', level=1)
+    doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+    res_table = doc.add_table(rows=0, cols=2)
+    res_table.style = 'Table Grid'
+    for k, v in calc_results.items():
+        row = res_table.add_row().cells
+        row[0].text = k
+        row[1].text = f"%{v:.0f}"
 
-    elif menu == "➕ Yeni Hasta Ekle":
-        analysis_form()
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
 
-def analysis_form():
-    st.header("🧪 Yeni Analiz ve Protokol Oluştur")
+# --- 5. ANALİZ FORMU (YENİ VE DÜZENLEME MODU) ---
+def analysis_form(edit_data=None):
+    mode = "Düzenle" if edit_data is not None else "Yeni"
+    st.header(f"🧪 {mode} Hasta Protokolü")
     
-    # 1. BÖLÜM: BİLGİLER
+    # Varsayılan değerleri ayarla
+    default_name = edit_data['hasta_adi'] if edit_data else ""
+    default_age = int(edit_data['yas']) if edit_data else 0
+    default_comment = edit_data['klinik_yorum'] if edit_data else ""
+    
     c1, c2 = st.columns([3, 1])
-    with c1: h_isim = st.text_input("Hastanın Adı Soyadı")
-    with c2: h_yas = st.number_input("Yaş", 0, 120)
-    h_yorum = st.text_area("Görüşme Hakkında Klinik Yorumlar", height=100)
+    h_isim = c1.text_input("Hastanın Adı Soyadı", value=default_name)
+    h_yas = c2.number_input("Yaş", 0, 120, value=default_age)
+    h_yorum = st.text_area("Klinik Yorumlar", value=default_comment, height=100)
 
-    # 2. BÖLÜM: KART TERCİHLERİ
-    st.divider()
-    st.write("**Kart Tercihleri**")
-    def kt_arayuzu(label, prefix):
-        st.write(label)
-        cols = st.columns(10); s = []
-        for i in range(1, 11):
-            with cols[i-1]:
-                if st.checkbox(f"{i}", key=f"{prefix}_{i}"): s.append(i)
-        return s
-    
-    b_cards = kt_arayuzu("En Beğendiği", "b")
-    b_reason = st.text_area("Beğenme Nedeni", key="br")
-    w_cards = kt_arayuzu("En Beğenmediği", "w")
-    w_reason = st.text_area("Beğenmeme Nedeni", key="wr")
-
-    # 3. BÖLÜM: PROTOKOL
-    st.divider()
+    # Protokol Verisi
     protokol_verileri = []
     renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
     
+    # Eğer edit modundaysak protokol_verisi JSON'dan listeye çevrilir
+    saved_protokol = json.loads(edit_data['protokol_verisi']) if edit_data else [{ "yanit": "", "anket": "", "kodlar": "" } for _ in range(10)]
+
     for i in range(1, 11):
         st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        with col1: yanit = st.text_area("Yanıt", key=f"y_{i}")
-        with col2: anket = st.text_area("Anket", key=f"a_{i}")
-        kodlar = st.text_area("Kodlar (Noktalı virgülle ayırın)", key=f"k_{i}", placeholder="G F+ A; D F- H")
+        v_yanit = col1.text_area("Yanıt", key=f"y_{i}", value=saved_protokol[i-1]['yanit'])
+        v_anket = col2.text_area("Anket", key=f"a_{i}", value=saved_protokol[i-1]['anket'])
+        v_kodlar = st.text_area("Kodlar", key=f"k_{i}", value=saved_protokol[i-1]['kodlar'])
         st.markdown('</div>', unsafe_allow_html=True)
-        protokol_verileri.append({"yanit": yanit, "anket": anket, "kodlar": kodlar})
+        protokol_verileri.append({"yanit": v_yanit, "anket": v_anket, "kodlar": v_kodlar})
 
-    # 4. BÖLÜM: ANALİZ VE KAYIT
-    if st.button("Analizi Tamamla, Kaydet ve Word Oluştur"):
+    if st.button(f"Analizi ve Kaydı Tamamla"):
+        # Psikogram Hesaplama
         total_r = 0; r_8910 = 0; all_codes = []
-        for i, data in enumerate(protokol_verileri, 1):
-            if data["kodlar"].strip():
-                resps = data["kodlar"].replace(';', '\n').split('\n')
+        for i, d in enumerate(protokol_verileri, 1):
+            if d["kodlar"].strip():
+                resps = d["kodlar"].replace(';', '\n').split('\n')
                 for r in resps:
-                    clean = r.strip()
+                    clean = r.strip(); 
                     if not clean or clean.lower() == "reddetme": continue
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
-                    for k in clean.replace(",", " ").split():
+                    for k in clean.replace(",", " ").split(): 
                         if k: all_codes.append(k)
-
+        
         if total_r > 0:
             counts = Counter(all_codes)
             calc = {
                 "%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100,
                 "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100,
-                "%A": ((counts["A"]+counts["Ad"])/total_r)*100,
-                "%H": ((counts["H"]+counts["Hd"])/total_r)*100,
+                "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100,
                 "RC": (r_8910/total_r)*100
             }
-            
-            # Veritabanına Kaydet
-            tarih = datetime.now().strftime("%d/%m/%Y %H:%M")
-            patient_sheet.append_row([st.session_state['user'], h_isim, h_yas, h_yorum, str(b_cards), str(w_cards), json.dumps(protokol_verileri), tarih])
-            st.success("Veriler veritabanına kaydedildi!")
+            p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
+            calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
 
-            # Analiz Özeti Göster
-            st.subheader(f"Analiz Özeti (R: {total_r})")
+            # Veritabanı Kayıt İşlemi (Edit ise satırı güncelle, yeni ise ekle)
+            tarih = datetime.now().strftime("%d/%m/%Y %H:%M")
+            new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, "", "", json.dumps(protokol_verileri), tarih]
+            
+            if edit_data is not None:
+                # Google Sheets'te ilgili satırı bul ve güncelle
+                cell = patient_sheet.find(edit_data['hasta_adi'])
+                patient_sheet.update(f'A{cell.row}:H{cell.row}', [new_row])
+                st.success("Kayıt güncellendi!")
+            else:
+                patient_sheet.append_row(new_row)
+                st.success("Yeni kayıt oluşturuldu!")
+
+            # Ekran Analiz Görünümü
             res_cols = st.columns(4)
             res_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
             res_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
             res_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
-            res_cols[3].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
+            res_cols[3].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
 
-            # WORD OLUŞTURMA
-            doc = Document()
-            doc.add_heading('Rorschach Klinik Raporu', 0)
-            doc.add_paragraph(f"Hasta: {h_isim} | Tarih: {tarih}")
-            doc.add_heading('Klinik Yorum', level=1); doc.add_paragraph(h_yorum)
-            # (Word kısmının detayları buraya eklenebilir)
-            bio = BytesIO(); doc.save(bio)
-            st.download_button("📄 Word Raporunu İndir", bio.getvalue(), f"{h_isim}_Rapor.docx")
+            # Word İndirme
+            report_data = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, protokol_verileri, total_r)
+            st.download_button("📄 Word Raporunu İndir", report_data, f"{h_isim}_Analiz.docx")
         else:
-            st.warning("Analiz için geçerli kod girilmedi.")
+            st.warning("Kod girilmediği için analiz yapılamıyor.")
 
-# --- ÇALIŞTIR ---
+# --- 6. GİRİŞ VE PANEL ---
+def auth_page():
+    st.title("🧠 Rorschach Klinik Panel")
+    t1, t2 = st.tabs(["Giriş", "Kayıt"])
+    with t1:
+        u = st.text_input("Kullanıcı")
+        p = st.text_input("Şifre", type="password")
+        if st.button("Giriş"):
+            df = pd.DataFrame(user_sheet.get_all_records())
+            if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
+                st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
+    with t2:
+        nu = st.text_input("Yeni Kullanıcı")
+        np = st.text_input("Yeni Şifre", type="password")
+        nn = st.text_input("Ad Soyad")
+        if st.button("Kaydol"):
+            user_sheet.append_row([nu, str(np), nn]); st.success("Kaydolundu!")
+
 if not st.session_state['logged_in']:
     auth_page()
 else:
-    dashboard()
+    st.sidebar.title(f"👤 {st.session_state['user']}")
+    menu = st.sidebar.radio("Menü", ["📁 Hastalarım", "➕ Yeni Hasta Ekle"])
+    if st.sidebar.button("Güvenli Çıkış"): st.session_state['logged_in'] = False; st.rerun()
+
+    if menu == "📁 Hastalarım":
+        st.header("Kayıtlı Protokoller")
+        df_p = pd.DataFrame(patient_sheet.get_all_records())
+        my_p = df_p[df_p['sahip'] == st.session_state['user']]
+        
+        if not my_p.empty:
+            for idx, row in my_p.iterrows():
+                if st.button(f"👤 {row['hasta_adi']} ({row['tarih']})", key=f"btn_{idx}"):
+                    st.session_state['editing_patient'] = row.to_dict()
+            
+            if st.session_state['editing_patient']:
+                st.divider()
+                if st.button("❌ Düzenlemeyi Kapat"): st.session_state['editing_patient'] = None; st.rerun()
+                analysis_form(st.session_state['editing_patient'])
+        else: st.info("Hasta kaydınız bulunmuyor.")
+
+    elif menu == "➕ Yeni Hasta Ekle":
+        st.session_state['editing_patient'] = None
+        analysis_form()
 
 st.markdown('<div class="footer">Kerem Birgül</div>', unsafe_allow_html=True)
