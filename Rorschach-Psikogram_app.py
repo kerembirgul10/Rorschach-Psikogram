@@ -221,49 +221,7 @@ def analysis_form(edit_data=None):
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
 
 # --- 6. NAVIGASYON ---
-if not st.session_state['logged_in']:
-    st.title("Rorschach Klinik Panel")
-    u = st.text_input("Kullanici"); p = st.text_input("Sifre", type="password")
-    if st.button("Giris"):
-        df = pd.DataFrame(user_sheet.get_all_records())
-        if u in df['kullanici_adi'].values and str(p) == str(df[df['kullanici_adi']==u]['sifre'].values[0]):
-            st.session_state['logged_in'] = True; st.session_state['user'] = u; st.rerun()
-else:
-    c_user, c_nav1, c_nav2, c_out = st.columns([1, 1, 1, 1])
-    with c_user: st.markdown(f"#### {st.session_state['user']}")
-    with c_nav1:
-        t_h = "primary" if st.session_state['page'] == "Hastalarim" else "secondary"
-        if st.button("Hastalarim", use_container_width=True, type=t_h): 
-            st.session_state['page'] = "Hastalarim"; st.rerun()
-    with c_nav2:
-        t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
-        if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): 
-            st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None
-            st.session_state['form_id'] = datetime.now().timestamp(); st.rerun()
-    with c_out:
-        if st.button("Cikis", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
-    st.divider()
 
-    if st.session_state['page'] == "Hastalarim":
-        if not st.session_state['editing_patient']:
-            search = st.text_input("", placeholder="Hasta Ara...")
-            data = pd.DataFrame(patient_sheet.get_all_records())
-            my_p = data[data['sahip'] == st.session_state['user']]
-            if not my_p.empty:
-                filt = my_p[my_p['hasta_adi'].str.contains(search, case=False)]
-                for _, row in filt.iterrows():
-                    if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True):
-                        st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-            else: st.info("Kayit yok.")
-        else:
-            if st.button("Kapat", type="primary"): 
-                st.session_state['editing_patient'] = None; st.rerun()
-            analysis_form(st.session_state['editing_patient'])
-            
-    elif st.session_state['page'] == "Yeni Hasta Ekle": 
-        analysis_form()
-
-st.markdown('<div class="footer">Kerem Birgul</div>', unsafe_allow_html=True)
 # --- 6. NAVIGASYON VE GIRIS EKRANI ---
 if not st.session_state['logged_in']:
     st.title("Rorschach Klinik Panel")
@@ -274,7 +232,7 @@ if not st.session_state['logged_in']:
     with t1:
         u = st.text_input("Kullanıcı Adı", key="login_u")
         p = st.text_input("Şifre", type="password", key="login_p")
-        if st.button("Sisteme Giriş"):
+        if st.button("Giriş"):
             df = pd.DataFrame(user_sheet.get_all_records())
             df.columns = df.columns.str.strip()
             if u in df['kullanici_adi'].values:
