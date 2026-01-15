@@ -197,7 +197,6 @@ def analysis_form(edit_data=None):
             for grup_adi, grup_liste in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
                 st.write(f"**{grup_adi}:** " + " | ".join([f"{k}: {counts[k]}" for k in grup_liste if counts[k] > 0]))
 
-            # WORD INDIRME BUTONU
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, protokol_verileri, total_r, b_cards, w_cards, b_reason, w_reason)
             st.download_button("📄 Word Raporu Indir", report, f"{h_isim}_Rorschach.docx")
 
@@ -206,7 +205,9 @@ def analysis_form(edit_data=None):
 # --- 7. NAVİGASYON ---
 if not st.session_state['logged_in']: auth_page()
 else:
-    st.sidebar.title(st.sidebar.title(st.session_state['user']))
+    # BU SATIR DÜZELTİLDİ: DeltaGenerator hatasını veren yanlış yapı silindi
+    st.sidebar.title(f"👤 {st.session_state['user']}")
+    
     menu = st.sidebar.radio("Menu", ["Hastalarim", "Yeni Hasta Ekle"])
     if st.sidebar.button("Cikis"): st.session_state['logged_in'] = False; st.rerun()
 
