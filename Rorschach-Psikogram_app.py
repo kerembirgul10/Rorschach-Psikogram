@@ -10,6 +10,7 @@ from datetime import datetime
 # WORD kütüphanesi
 try:
     from docx import Document
+    from docx.shared import Pt
 except ImportError:
     pass
 
@@ -78,7 +79,41 @@ def auth_page():
         if st.button("Kaydol"):
             user_sheet.append_row([nu, str(np), nn]); st.success("Kayit basarili.")
 
-# --- 5. ANALİZ FORMU ---
+# --- 5. WORD RAPOR FONKSİYONU ---
+def create_word_report(h_info, calc_results, counts, protokol_list, total_r, b_cards, w_cards, b_reason, w_reason):
+    doc = Document()
+    doc.add_heading('Rorschach Klinik Analiz Raporu', 0)
+    
+    doc.add_heading('1. Hasta Bilgileri', level=1)
+    doc.add_paragraph(f"Ad Soyad: {h_info['name']}\nYaş: {h_info['age']}\nTarih: {h_info['date']}")
+    doc.add_heading('Klinik Yorumlar:', level=2)
+    doc.add_paragraph(h_info['comment'])
+
+    doc.add_heading('2. Kart Tercihleri', level=1)
+    doc.add_paragraph(f"En Beğenilen Kartlar: {b_cards}")
+    doc.add_paragraph(f"Beğenme Nedeni: {b_reason}")
+    doc.add_paragraph(f"En Beğenilmeyen Kartlar: {w_cards}")
+    doc.add_paragraph(f"Beğenmeme Nedeni: {w_reason}")
+
+    doc.add_heading('3. Test Protokolü', level=1)
+    table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
+    hdr = table.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
+    for i, p in enumerate(protokol_list, 1):
+        row = table.add_row().cells
+        row[0].text, row[1].text, row[2].text, row[3].text = str(i), str(p['yanit']), str(p['anket']), str(p['kodlar'])
+
+    doc.add_heading('4. Psikogram ve Frekanslar', level=1)
+    doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
+    for k, v in calc_results.items():
+        doc.add_paragraph(f"{k}: %{v:.1f}")
+    
+    doc.add_heading('Kod Frekansları:', level=2)
+    doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
+    
+    bio = BytesIO(); doc.save(bio); return bio.getvalue()
+
+# --- 6. ANALİZ FORMU ---
 def analysis_form(edit_data=None):
     st.header(f"{'Duzenle' if edit_data else 'Yeni'} Protokol")
     d_name = edit_data.get('hasta_adi', "") if edit_data else ""
@@ -142,7 +177,6 @@ def analysis_form(edit_data=None):
                 "%A": ((counts["A"]+counts["Ad"])/total_r)*100,
                 "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100
             }
-            # TRI HESABI
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
 
@@ -163,12 +197,16 @@ def analysis_form(edit_data=None):
             for grup_adi, grup_liste in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
                 st.write(f"**{grup_adi}:** " + " | ".join([f"{k}: {counts[k]}" for k in grup_liste if counts[k] > 0]))
 
+            # WORD INDIRME BUTONU
+            report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih}, calc, counts, protokol_verileri, total_r, b_cards, w_cards, b_reason, w_reason)
+            st.download_button("📄 Word Raporu Indir", report, f"{h_isim}_Rorschach.docx")
+
         else: st.warning("Kod girilmedi.")
 
-# --- 6. NAVİGASYON ---
+# --- 7. NAVİGASYON ---
 if not st.session_state['logged_in']: auth_page()
 else:
-    st.sidebar.title(st.session_state['user'])
+    st.sidebar.title(st.sidebar.title(st.session_state['user']))
     menu = st.sidebar.radio("Menu", ["Hastalarim", "Yeni Hasta Ekle"])
     if st.sidebar.button("Cikis"): st.session_state['logged_in'] = False; st.rerun()
 
