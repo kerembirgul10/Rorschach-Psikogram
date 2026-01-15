@@ -18,6 +18,7 @@ except ImportError:
 GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
+GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"] # Yeni Eklenen Grup
 
 # --- 2. GOOGLE SHEETS BAĞLANTISI ---
 @st.cache_resource
@@ -32,7 +33,7 @@ try:
     user_sheet = sheet.worksheet("Kullanıcılar")
     patient_sheet = sheet.worksheet("Hastalar")
 except Exception as e:
-    st.error(f"Bağlantı hatası: {e}")
+    st.error(f"Baglanti hatasi: {e}")
     st.stop()
 
 # --- 3. TASARIM ---
@@ -40,6 +41,8 @@ st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
     textarea { resize: none !important; border: 1px solid #ced4da !important; border-radius: 5px !important; }
+    
+    /* Psikogram Kutu Renkleri (ESKİ HALİNE DÖNDÜ) */
     .metric-container {
         height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center;
         border-radius: 10px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
@@ -47,14 +50,15 @@ st.markdown("""
     .metric-label { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
     .metric-value { font-size: 24px; font-weight: 900; }
     .bg-sari { background-color: #FFD93D; border: 2px solid #E2B200; }
-    .bg-yesil { background-color: #2ECC71 !important; border: 2px solid #27AE60 !important; color: white !important; }
+    .bg-kirmizi { background-color: #FF6B6B; border: 2px solid #D63031; }
     .bg-mor { background-color: #A29BFE; border: 2px solid #6C5CE7; }
+    
     .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
     .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     
-    /* Streamlit buton renklerini yeşile çekmek için müdahale */
+    /* Üst Menü Aktif Buton Rengi (YEŞİL KALDI) */
     button[kind="primary"] {
         background-color: #2ECC71 !important;
         color: white !important;
@@ -76,22 +80,22 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_paragraph(f"Yas: {h_info['age']}\nUygulama Tarihi: {selected_date}")
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info['comment'])
-    doc.add_heading('Kart Tercihleri', level=1)
-    doc.add_paragraph(f"Begendigi: {b_cards} (Nedeni: {b_reason})")
-    doc.add_paragraph(f"Begenmedigi: {w_cards} (Nedeni: {w_reason})")
+    
     doc.add_heading('Test Protokolu (Yanitlar, Anketler ve Kodlar)', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text = 'Kart', 'Yanit', 'Anket', 'Kodlar'
+    hdr = table.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanit', 'Anket', 'Kodlar'
     for i, p in enumerate(protokol, 1):
-        row_cells = table.add_row().cells
-        row_cells[0].text, row_cells[1].text = str(i), str(p.get('yanit', ''))
-        row_cells[2].text, row_cells[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
+        row = table.add_row().cells
+        row[0].text, row[1].text = str(i), str(p.get('yanit', ''))
+        row[2].text, row[3].text = str(p.get('anket', '')), str(p.get('kodlar', ''))
+    
     doc.add_heading('Psikogram Analizi', level=1)
-    doc.add_paragraph(f"Toplam Yanit Sayisi (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
+    
     doc.add_heading('Kod Frekanslari', level=2)
     doc.add_paragraph(", ".join([f"{k}: {v}" for k, v in counts.items() if v > 0]))
+    
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 5. ANALIZ FORMU ---
@@ -151,7 +155,7 @@ def analysis_form(edit_data=None):
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
-        st.success(f"Veriler {tarih_str} tarihiyle kaydedildi.")
+        st.success(f"Kaydedildi: {tarih_str}")
 
     if calc_clicked:
         total_r = 0; r_8910 = 0; all_codes = []
@@ -164,20 +168,24 @@ def analysis_form(edit_data=None):
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
                     for code in line.replace(",", " ").split(): all_codes.append(code)
+        
         if total_r > 0:
             counts = Counter(all_codes)
             calc = {"%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100, "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100, "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100}
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
+            
             st.subheader(f"Analiz (R: {total_r})")
             m_cols = st.columns(4)
             m_cols[0].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">%G / %D</div><div class="metric-value">%{calc["%G"]:.0f} / %{calc["%D"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[1].markdown(f'<div class="metric-container bg-kirmizi"><div class="metric-label">%F</div><div class="metric-value">%{calc["%F"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[2].markdown(f'<div class="metric-container bg-mor"><div class="metric-label">%A / %H</div><div class="metric-value">%{calc["%A"]:.0f} / %{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
             m_cols[3].markdown(f'<div class="metric-container bg-sari"><div class="metric-label">TRI / RC</div><div class="metric-value">%{calc["TRI"]:.0f} / %{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
+
             st.write("**Grup Kod Dagilimi:**")
-            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3)]:
+            for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("Icerik", GRUP_3), ("Ozel Gruplar", GRUP_4)]:
                 st.write(f"**{g_n}:** " + " | ".join([f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]))
+
             report = create_word_report({'name': h_isim, 'age': h_yas, 'comment': h_yorum, 'date': tarih_str}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verileri, tarih_str)
             st.download_button("Word Indir", report, f"{h_isim}_Rorschach.docx")
 
