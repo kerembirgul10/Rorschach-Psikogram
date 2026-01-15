@@ -138,7 +138,7 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
         # Sadece o grupta olan ve puanlanmış kodları filtrele
         grup_kodlari = [f"{k}: {counts[k]}" for k in grup_liste if counts[k] > 0]
         if grup_kodlari:
-            doc.add_paragraph(f"**{grup_adi}:** " + " | ".join(grup_kodlari))
+            doc.add_paragraph(f"{grup_adi}: " + " | ".join(grup_kodlari))
 
     # Gruplarda olmayan diğer kodlar varsa en sona ekle
     diger_kodlar = [f"{k}: {counts[k]}" for k in counts if k not in TUM_GRUPLAR and counts[k] > 0]
