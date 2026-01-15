@@ -68,12 +68,8 @@ if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'user' not in st.session_state: st.session_state['user'] = ""
 if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
-
-# Sıfırlama Fonksiyonu
-def reset_form_state():
-    for key in list(st.session_state.keys()):
-        if key.endswith("_list") or key.startswith("y_") or key.startswith("a_") or key.startswith("k_"):
-            del st.session_state[key]
+# Yeni hasta formu için benzersiz bir ID oluşturuyoruz
+if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now().timestamp()
 
 # --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol, selected_date):
@@ -100,37 +96,41 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
 
 # --- 5. ANALIZ FORMU ---
 def analysis_form(edit_data=None):
+    # Form_id her 'Yeni Hasta' denildiğinde değişeceği için kutular sıfırlanır
+    f_id = st.session_state['form_id'] if edit_data is None else "edit"
+    
     st.header(f"{'Duzenle' if edit_data else 'Yeni'} Hasta Protokolu")
     c_info1, c_info2, c_info3 = st.columns([3, 1, 2])
-    h_isim = c_info1.text_input("Hastanin Adi Soyadi", value=edit_data.get('hasta_adi', "") if edit_data else "")
-    h_yas = c_info2.number_input("Yas", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0)
+    h_isim = c_info1.text_input("Hastanin Adi Soyadi", value=edit_data.get('hasta_adi', "") if edit_data else "", key=f"name_{f_id}")
+    h_yas = c_info2.number_input("Yas", 0, 120, value=int(edit_data.get('yas', 0)) if edit_data else 0, key=f"age_{f_id}")
     
     if edit_data and edit_data.get('tarih'):
         try: default_date = datetime.strptime(edit_data['tarih'], "%d/%m/%Y").date()
         except: default_date = datetime.now().date()
     else: default_date = datetime.now().date()
-    h_tarih = c_info3.date_input("Test Uygulama Tarihi", value=default_date, format="DD/MM/YYYY")
+    h_tarih = c_info3.date_input("Test Uygulama Tarihi", value=default_date, format="DD/MM/YYYY", key=f"date_{f_id}")
     tarih_str = h_tarih.strftime("%d/%m/%Y")
-    h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100)
+    h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100, key=f"comment_{f_id}")
 
     st.divider(); st.subheader("Kart Tercihleri")
     def box_selector(label, key_prefix, saved_val):
         st.write(label)
         saved_list = json.loads(saved_val) if saved_val else []
-        if f"{key_prefix}_list" not in st.session_state: st.session_state[f"{key_prefix}_list"] = saved_list
+        state_key = f"{key_prefix}_list_{f_id}"
+        if state_key not in st.session_state: st.session_state[state_key] = saved_list
         cols = st.columns(10)
         for i in range(1, 11):
-            is_sel = i in st.session_state[f"{key_prefix}_list"]
-            if cols[i-1].button(str(i), key=f"{key_prefix}_{i}", type="primary" if is_sel else "secondary"):
-                if is_sel: st.session_state[f"{key_prefix}_list"].remove(i)
-                else: st.session_state[f"{key_prefix}_list"].append(i)
+            is_sel = i in st.session_state[state_key]
+            if cols[i-1].button(str(i), key=f"{state_key}_{i}", type="primary" if is_sel else "secondary"):
+                if is_sel: st.session_state[state_key].remove(i)
+                else: st.session_state[state_key].append(i)
                 st.rerun()
-        return st.session_state[f"{key_prefix}_list"]
+        return st.session_state[state_key]
 
     b_cards = box_selector("En Begendigi Kartlar", "best", edit_data.get('en_begendigi', "[]") if edit_data else "[]")
-    b_reason = st.text_area("Begenme Nedeni", value=edit_data.get('en_begendigi_neden', "") if edit_data else "")
+    b_reason = st.text_area("Begenme Nedeni", value=edit_data.get('en_begendigi_neden', "") if edit_data else "", key=f"br_{f_id}")
     w_cards = box_selector("En Begenmedigi Kartlar", "worst", edit_data.get('en_beğenmediği', "[]") if edit_data else "[]")
-    w_reason = st.text_area("Begenmeme Nedeni", value=edit_data.get('en_beğenmediği_neden', "") if edit_data else "")
+    w_reason = st.text_area("Begenmeme Nedeni", value=edit_data.get('en_beğenmediği_neden', "") if edit_data else "", key=f"wr_{f_id}")
 
     st.divider()
     protokol_verileri = []
@@ -140,9 +140,9 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        y = col1.text_area("Yanit", key=f"y_{i}", value=saved_p[i-1].get('yanit',''))
-        a = col2.text_area("Anket", key=f"a_{i}", value=saved_p[i-1].get('anket',''))
-        k = st.text_area("Kodlar", key=f"k_{i}", value=saved_p[i-1].get('kodlar',''))
+        y = col1.text_area("Yanit", key=f"y_{i}_{f_id}", value=saved_p[i-1].get('yanit',''))
+        a = col2.text_area("Anket", key=f"a_{i}_{f_id}", value=saved_p[i-1].get('anket',''))
+        k = st.text_area("Kodlar", key=f"k_{i}_{f_id}", value=saved_p[i-1].get('kodlar',''))
         st.markdown('</div>', unsafe_allow_html=True)
         protokol_verileri.append({"yanit": y, "anket": a, "kodlar": k})
 
@@ -217,14 +217,16 @@ else:
     with c_nav2:
         t_y = "primary" if st.session_state['page'] == "Yeni Hasta Ekle" else "secondary"
         if st.button("Yeni Hasta Ekle", use_container_width=True, type=t_y): 
-            st.session_state['page'] = "Yeni Hasta Ekle"; st.session_state['editing_patient'] = None; 
-            reset_form_state(); st.rerun()
+            st.session_state['page'] = "Yeni Hasta Ekle"
+            st.session_state['editing_patient'] = None
+            # ÖNEMLİ: Yeni formu temizlemek için benzersiz bir ID atıyoruz
+            st.session_state['form_id'] = datetime.now().timestamp()
+            st.rerun()
     with c_out:
         if st.button("Cikis", use_container_width=True): st.session_state['logged_in'] = False; st.rerun()
     st.divider()
 
     if st.session_state['page'] == "Hastalarim":
-        # Hasta seçilmemişse arama motorunu göster
         if not st.session_state['editing_patient']:
             search = st.text_input("", placeholder="Hasta Ara...")
             data = pd.DataFrame(patient_sheet.get_all_records())
@@ -235,8 +237,6 @@ else:
                     if st.button(row['hasta_adi'], key=f"p_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
             else: st.info("Kayit yok.")
-        
-        # Hasta seçilmişse sadece onun analizini göster
         else:
             if st.button("Kapat", type="primary"): 
                 st.session_state['editing_patient'] = None; st.rerun()
