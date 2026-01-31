@@ -64,15 +64,6 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* Yanıt Alt Kutusu */
-    .yanit-kutu {
-        background-color: #f9f9f9;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 10px;
-    }
-
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -162,24 +153,25 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # KART RENKLERİ (Senin belirlediğin liste)
+    # KART RENKLERİ (Mavi, Kırmızı, Mor vb.)
     renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
+    # Başlık metni için koyu renkler (Okunabilirlik için)
+    text_colors = ["#004085", "#721c24", "#3e007c", "#002752", "#004085", "#155724", "#856404", "#856404", "#721c24", "#383d41"]
     
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
         kart_rengi = renkler[i-1]
+        text_rengi = text_colors[i-1]
         
-        # --- ANA KUTU (Her şeyi saran yapı) ---
-        # Streamlit'in kendi border özelliği her şeyi bir arada tutar.
-        # Rengi başlıkta ve ayraçlarda veriyoruz.
-        with st.container(border=True):
+        # --- ANA KUTU (Standart Container, gri çerçeve YOK) ---
+        with st.container():
             
-            # Kart Başlığı (Renkli Zemin)
+            # 1. BAŞLIK ŞERİDİ (Komple Renkli Kutu)
             st.markdown(f'''
-                <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                    <h3 style="margin: 0; color: #333;">KART {i}</h3>
+                <div style="background-color: {kart_rengi}; padding: 15px; border-radius: 10px 10px 0 0; margin-top: 20px; text-align: center;">
+                    <h3 style="margin: 0; color: {text_rengi};">KART {i}</h3>
                 </div>
             ''', unsafe_allow_html=True)
             
@@ -193,11 +185,16 @@ def analysis_form(edit_data=None):
                     except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
                 else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-            # Yanıtlar
+            # Yanıtlar Döngüsü
             for idx, item in enumerate(st.session_state[kart_key]):
                 
-                # Yanıt Kutusu
-                st.markdown(f'<div class="yanit-kutu">', unsafe_allow_html=True)
+                # Yanıtlar Arası Ayırıcı (Kart renginde Çizgi)
+                if idx > 0:
+                    st.markdown(f'''<hr style="border: 0; border-top: 4px solid {kart_rengi}; margin: 0;">''', unsafe_allow_html=True)
+                
+                # Yanıt İçeriği (Kenarları renkli çizgi ile kapalı hissi vermek için stil)
+                st.markdown(f'''<div style="border-left: 4px solid {kart_rengi}; border-right: 4px solid {kart_rengi}; padding: 15px;">''', unsafe_allow_html=True)
+                
                 st.write(f"**YANIT {cum_yanit_index}**")
                 
                 c_y, c_a = st.columns([1, 1])
@@ -226,9 +223,19 @@ def analysis_form(edit_data=None):
                     if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                         st.session_state[kart_key].pop(idx)
                         st.rerun()
+                
+                # HTML div kapatma
                 st.markdown('</div>', unsafe_allow_html=True)
                 cum_yanit_index += 1
 
+            # 3. ALT KAPATMA ÇİZGİSİ VE BUTON ALANI
+            # Yanıtlar bittiğinde alt tarafı kapatan renkli alan
+            st.markdown(f'''
+                <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 0 0 10px 10px; margin-bottom: 30px;">
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            # Butonu dışarıya (hemen altına) koyuyoruz ki HTML içinde kaybolmasın
             if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
                 st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
                 st.rerun()
