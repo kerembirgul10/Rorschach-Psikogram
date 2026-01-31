@@ -37,7 +37,7 @@ except Exception as e:
     st.error(f"Baglanti hatasi: {e}")
     st.stop()
 
-# --- 3. TASARIM (YENİLENMİŞ İNCE ÇERÇEVE SİSTEMİ) ---
+# --- 3. TASARIM ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
@@ -48,7 +48,6 @@ st.markdown("""
     }
     textarea { border: 1px solid #ced4da !important; border-radius: 5px !important; }
     
-    /* Psikogram Kutuları */
     .metric-container {
         height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;
         border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
@@ -64,28 +63,27 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* YENİ KART TASARIMI: HER YÖNDEN SARAN İNCE ÇERÇEVE */
+    /* KART ÇERÇEVE VE RENK AYARI */
     .kart-ana-kutu {
-        padding: 20px;
+        padding: 25px;
         border-radius: 15px;
-        margin-bottom: 35px;
-        border: 2px solid; /* Renk dinamik, kalınlık 2px */
-        background-color: rgba(255, 255, 255, 0.5); /* Hafif şeffaf iç alan */
+        margin-bottom: 30px;
+        border: 1.5px solid rgba(0,0,0,0.3) !important; /* Her yönden saran ince çerçeve */
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
     }
     .yanit-alt-kutu {
-        background-color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.6);
         padding: 15px;
         border-radius: 10px;
-        border: 1px solid #e9ecef;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.1);
+        margin-bottom: 15px;
     }
     .kart-baslik {
         font-size: 20px;
         font-weight: 800;
         margin-bottom: 15px;
         display: block;
-        letter-spacing: 0.5px;
+        color: #000;
     }
     
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
@@ -177,16 +175,16 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # KART RENKLERİ (İnce Çerçeveler İçin)
-    kart_renkleri = ["#3498db", "#e74c3c", "#9b59b6", "#34495e", "#1abc9c", "#27ae60", "#f1c40f", "#e67e22", "#d35400", "#7f8c8d"]
+    # ESKİ RENKLER LİSTESİ (Arka planlar için)
+    renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
-        # KART ANA KUTU (HER YÖNDEN SARAN İNCE ÇERÇEVE)
+        # KART ANA KUTU (Eski renkler + her yönden saran ince çerçeve)
         st.markdown(f'''
-            <div class="kart-ana-kutu" style="border-color: {kart_renkleri[i-1]};">
-                <span class="kart-baslik" style="color: {kart_renkleri[i-1]};">KART {i}</span>
+            <div class="kart-ana-kutu" style="background-color: {renkler[i-1]};">
+                <span class="kart-baslik">KART {i}</span>
         ''', unsafe_allow_html=True)
         
         kart_key = f"kart_data_{i}_{f_id}"
@@ -274,7 +272,7 @@ def analysis_form(edit_data=None):
             st.write("**Kod Frekansları:**")
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
                 kds = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
-                if kds: st.write(f"**{g_n}:** " + " | ".join(kds))
+                if kds: st.write(f"**{g_n}:** " + " | ".join(kodlar))
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
             bio = BytesIO(); diag.save(bio)
             st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx", use_container_width=True)
