@@ -64,6 +64,15 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
+    /* Alt kutu stili */
+    .yanit-alt-kutu {
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #eee;
+        background-color: #fafafa;
+        margin-bottom: 15px;
+    }
+    
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -162,12 +171,16 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         kart_rengi = renkler[i-1]
         
-        # --- KART BAŞLANGIÇ ÇİZGİSİ VE BAŞLIK ---
-        # Üst tarafı kapatan kalın çizgi ve başlık
+        # KART ANA KUTU (Tüm içeriği saran 4 taraflı çerçeve)
         st.markdown(f'''
-            <div style="border-top: 5px solid {kart_rengi}; padding-top: 10px; margin-top: 20px;">
-                <h3 style="color: {kart_rengi}; margin: 0;">KART {i}</h3>
-            </div>
+            <div style="
+                border: 3px solid {kart_rengi}; 
+                border-radius: 12px; 
+                padding: 20px; 
+                margin-bottom: 30px;
+                background-color: #ffffff;
+                ">
+                <h3 style="color: {kart_rengi}; margin-top: 0;">KART {i}</h3>
         ''', unsafe_allow_html=True)
         
         kart_key = f"kart_data_{i}_{f_id}"
@@ -183,7 +196,7 @@ def analysis_form(edit_data=None):
         # Yanıtlar Döngüsü
         for idx, item in enumerate(st.session_state[kart_key]):
             
-            # Yanıtlar arasında ve üstte ayrıştırıcı çizgi (İlk yanıt değilse araya çizgi at)
+            # Yanıtları birbirinden ayıran kesikli çizgi
             if idx > 0:
                 st.markdown(f'<div style="border-top: 2px dashed {kart_rengi}; margin: 20px 0;"></div>', unsafe_allow_html=True)
             
@@ -218,17 +231,14 @@ def analysis_form(edit_data=None):
             
             cum_yanit_index += 1
 
-        # Yanıt Ekle Butonu
+        # Yanıt Ekle Butonu (Kutunun içinde)
         st.markdown(f'<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
             st.rerun()
             
-        # --- KART BİTİŞ ÇİZGİSİ ---
-        # Alt tarafı kapatan kalın çizgi (Çerçeveyi tamamlar)
-        st.markdown(f'''
-            <div style="border-bottom: 5px solid {kart_rengi}; margin-bottom: 40px; margin-top: 10px;"></div>
-        ''', unsafe_allow_html=True)
+        # Kart Ana Kutu Kapanış
+        st.markdown('</div>', unsafe_allow_html=True)
         
         current_protocol.append(st.session_state[kart_key])
 
