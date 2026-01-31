@@ -24,17 +24,24 @@ TUM_GRUPLAR = GRUP_1 + GRUP_2 + GRUP_3 + GRUP_4
 # --- 2. GOOGLE SHEETS BAĞLANTISI ---
 @st.cache_resource
 def get_gsheet_client():
-    creds_info = json.loads(st.secrets["gcp_service_account"])
-    creds = Credentials.from_service_account_info(creds_info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-    return gspread.authorize(creds)
+    try:
+        creds_info = json.loads(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        return gspread.authorize(creds)
+    except Exception as e:
+        return None
 
 try:
     client = get_gsheet_client()
-    sheet = client.open("Rorschach_Veritabani")
-    user_sheet = sheet.worksheet("Kullanıcılar")
-    patient_sheet = sheet.worksheet("Hastalar")
+    if client:
+        sheet = client.open("Rorschach_Veritabani")
+        user_sheet = sheet.worksheet("Kullanıcılar")
+        patient_sheet = sheet.worksheet("Hastalar")
+    else:
+        st.error("Google Sheets bağlantısı kurulamadı. Secrets ayarlarını kontrol edin.")
+        st.stop()
 except Exception as e:
-    st.error(f"Baglanti hatasi: {e}")
+    st.error(f"Bağlantı hatası: {e}")
     st.stop()
 
 # --- 3. TASARIM ---
@@ -96,7 +103,6 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     hdr = table.rows[0].cells
     hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
     
-    # Protokol verisi içinde döngü
     for i, kart_data in enumerate(protokol_verisi, 1):
         responses = [kart_data] if isinstance(kart_data, dict) else kart_data
         for idx, resp in enumerate(responses):
@@ -167,7 +173,6 @@ def analysis_form(edit_data=None):
         kart_rengi = renkler[i-1]
         
         with st.container():
-            # 1. Başlık Şeridi
             st.markdown(f'''
                 <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 5px 5px 0 0; margin-top: 20px;">
                     <h3 style="margin: 0; color: #333;">KART {i}</h3>
@@ -184,7 +189,6 @@ def analysis_form(edit_data=None):
                     except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
                 else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-            # 2. Yanıtlar Çerçevesi
             st.markdown(f'<div style="border-left: 4px solid {kart_rengi}; border-right: 4px solid {kart_rengi}; padding: 10px;">', unsafe_allow_html=True)
 
             for idx, item in enumerate(st.session_state[kart_key]):
@@ -222,7 +226,6 @@ def analysis_form(edit_data=None):
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # 3. Kapatma
             st.markdown(f'''
                 <div style="background-color: {kart_rengi}; padding: 8px; border-radius: 0 0 5px 5px; margin-bottom: 20px;"></div>
             ''', unsafe_allow_html=True)
@@ -233,7 +236,6 @@ def analysis_form(edit_data=None):
         
         current_protocol.append(st.session_state[kart_key])
 
-    # Alt Menü Butonları
     c_btn1, c_btn2 = st.columns(2)
     if c_btn1.button("Sadece Kaydet", use_container_width=True):
         new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(current_protocol), tarih_str, b_reason, w_reason]
@@ -269,10 +271,11 @@ def analysis_form(edit_data=None):
                 kds = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
                 if kds: st.write(f"**{g_n}:** " + " | ".join(kds))
             
-            # --- HIZLI WORD İNDİRME (YENİ HASTA EKRANI İÇİN) ---
+            # --- DÜZELTİLMİŞ İNDİRME BUTONU (YENİ HASTA EKRANI) ---
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
             bio = BytesIO(); diag.save(bio); bio.seek(0)
-            st.download_button("Word İndir", bio, f"{h_isim}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+            file_n = f"{h_isim}.docx" if h_isim else "Rorschach_Rapor.docx"
+            st.download_button("Word İndir", data=bio, file_name=file_n, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
 
 # --- 6. NAVIGASYON ---
 if not st.session_state['logged_in']:
@@ -319,7 +322,7 @@ else:
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
                     
-                    # --- HIZLI WORD İNDİRME (DÜZELTİLDİ: DIRECT RENDER) ---
+                    # --- DÜZELTİLMİŞ İNDİRME BUTONU (LİSTE EKRANI) ---
                     try:
                         p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
                         for i, kart_list in enumerate(p_v, 1):
@@ -331,13 +334,13 @@ else:
                                     if i in [8,9,10]: r89 += 1
                                     for c in kd.split(): all_c.append(c.strip())
                         counts = Counter(all_c)
-                        # Calc hesabı (Basit)
                         calc = {"%G": (counts["G"]/t_r)*100 if t_r>0 else 0, "R": t_r} 
                         
                         doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, calc, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
                         bio = BytesIO(); doc.save(bio); bio.seek(0)
                         
-                        r2.download_button("📄 İndir", data=bio, file_name=f"{row['hasta_adi']}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"dl_{_}")
+                        f_name = f"{row['hasta_adi']}.docx"
+                        r2.download_button("📄 İndir", data=bio, file_name=f_name, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"dl_{_}")
                     except Exception as e:
                         r2.write("Hata")
 
