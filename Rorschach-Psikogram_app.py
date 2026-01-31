@@ -56,8 +56,8 @@ st.markdown("""
     .c-h { background-color: #D1A3FF; border: 2px solid #8E44AD; }
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
-    .kart-wrapper { padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid rgba(0,0,0,0.1); }
-    .kart-title-top { font-size: 18px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: #000000 !important; }
+    .kart-wrapper { padding: 30px; border-radius: 15px; margin-bottom: 30px; border: 1px solid rgba(0,0,0,0.1); }
+    .kart-title-top { font-size: 20px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 15px; color: #000000 !important; }
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -75,7 +75,7 @@ if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now().timestamp()
 
-# --- 4. WORD RAPOR (Dinamik Satırlara Uygun) ---
+# --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verisi, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
@@ -96,7 +96,7 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     for i, kart_yanitlari in enumerate(protokol_verisi, 1):
         for idx, y_paketi in enumerate(kart_yanitlari):
             row = table.add_row().cells
-            row[0].text = f"Kart {i}" if idx == 0 else "" # Kart numarasını sadece ilk satırda yaz
+            row[0].text = f"Kart {i}" if idx == 0 else ""
             row[1].text = str(y_paketi.get('y', ''))
             row[2].text = str(y_paketi.get('a', ''))
             row[3].text = str(y_paketi.get('k', ''))
@@ -130,7 +130,6 @@ def analysis_form(edit_data=None):
     h_yorum = st.text_area("Klinik Yorumlar", value=edit_data.get('klinik_yorum', "") if edit_data else "", height=100, key=f"comment_{f_id}")
 
     st.divider()
-    # Kart Seçimleri (box_selector fonksiyonu burada devam ediyor...)
     def box_selector(label, key_prefix, saved_val):
         st.write(label)
         saved_list = json.loads(saved_val) if saved_val else []
@@ -152,9 +151,7 @@ def analysis_form(edit_data=None):
 
     st.divider()
     
-    # --- DİNAMİK PROTOKOL VERİSİ YÜKLEME ---
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
-    
     renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
     current_protocol = []
 
@@ -163,27 +160,49 @@ def analysis_form(edit_data=None):
         
         kart_key = f"kart_data_{i}_{f_id}"
         if kart_key not in st.session_state:
-            # Eski tekli veriyi yeni liste yapısına çevir (Geriye dönük uyumluluk)
             if raw_p:
                 old_val = raw_p[i-1]
-                if isinstance(old_val, dict) and "yanit" in old_val:
-                    st.session_state[kart_key] = [{"y": old_val["yanit"], "a": old_val["anket"], "k": old_val["kodlar"]}]
-                else:
-                    st.session_state[kart_key] = old_val
-            else:
-                st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
+                if isinstance(old_val, dict): st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
+                else: st.session_state[kart_key] = old_val
+            else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-        # Her kartın içindeki yanıt satırlarını göster
         for idx, item in enumerate(st.session_state[kart_key]):
-            c_y, c_a, c_k = st.columns([3, 3, 2])
-            item["y"] = c_y.text_area(f"Yanıt {idx+1}", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]))
-            item["a"] = c_a.text_area(f"Anket {idx+1}", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]))
-            item["k"] = c_k.text_area(f"Kod {idx+1}", value=item["k"], key=f"k_{i}_{idx}_{f_id}", height=get_auto_height(item["k"]))
+            st.write(f"**Yanıt {idx+1}:**")
+            c_y, c_a = st.columns([1, 1])
+            item["y"] = c_y.text_area("Yanıt", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
+            item["a"] = c_a.text_area("Anket", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
             
+            # --- SEÇMELİ KOD PANELİ ---
+            st.markdown("*Kod Seçimi:*")
+            g_cols = st.columns(4)
+            gruplar = [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel", GRUP_4)]
+            
+            # Mevcut kodları analiz et
+            current_codes = item["k"].split() if item["k"] else []
+            selected_from_lists = []
+
+            for g_idx, (g_name, g_list) in enumerate(gruplar):
+                with g_cols[g_idx]:
+                    # Multiselect ile görsel panel (her zaman açık kutu)
+                    defaults = [c for c in current_codes if c in g_list]
+                    chosen = st.multiselect(g_name, options=g_list, default=defaults, key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
+                    selected_from_lists.extend(chosen)
+
+            # Ekstra Kod Kutusu
+            manual_codes = [c for c in current_codes if c not in TUM_GRUPLAR]
+            extra_input = st.text_input("Ekstra / Manuel Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari, Sosyal vb.")
+            
+            # Tümünü birleştir
+            final_codes = selected_from_lists + extra_input.replace(",", " ").split()
+            item["k"] = " ".join(list(dict.fromkeys(final_codes))) # Sıralı ve eşsiz birleştirme
+            
+            st.info(f"Seçili Kodlar: {item['k'] if item['k'] else 'Yok'}")
+
             if len(st.session_state[kart_key]) > 1:
                 if st.button(f"K{i} - Yanıt {idx+1} Sil", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
+            st.divider()
 
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}"):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
@@ -192,26 +211,22 @@ def analysis_form(edit_data=None):
         st.markdown('</div>', unsafe_allow_html=True)
         current_protocol.append(st.session_state[kart_key])
 
-    b_save = st.button("Sadece Kaydet")
-    b_calc = st.button("Psikogramı Hesapla")
-
-    if b_save or b_calc:
+    # Kaydet ve Hesapla Butonları
+    if st.button("Sadece Kaydet"):
         new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(current_protocol), tarih_str, b_reason, w_reason]
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
         st.success("Kaydedildi.")
 
-    if b_calc:
+    if st.button("Psikogramı Hesapla"):
         all_c = []; total_r = 0; r_8910 = 0
         for i, kart_list in enumerate(current_protocol, 1):
-            for y_paketi in kart_list:
-                kod_str = y_paketi["k"].strip()
-                if kod_str:
+            for y_p in kart_list:
+                if y_p["k"].strip():
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
-                    for c in kod_str.replace(",", " ").replace(";", " ").split():
-                        all_c.append(c.replace("’","'").strip())
+                    for c in y_p["k"].split(): all_c.append(c.strip())
         
         if total_r > 0:
             counts = Counter(all_c)
@@ -254,7 +269,6 @@ if not st.session_state['logged_in']:
         if st.button("Kayıt Ol"):
             user_sheet.append_row([nu, str(np), nn]); st.success("Kaydedildi.")
 else:
-    # (Üst Menü ve Hastalarım/Yeni Hasta Ekle Navigasyon Kodları buraya gelecek...)
     c_u, c_n1, c_n2, c_o = st.columns([1, 1, 1, 1])
     with c_u: st.markdown(f"#### {st.session_state['user']}")
     with c_n1:
@@ -284,30 +298,25 @@ else:
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
                     
-                    # Hızlı Rapor İndirme (Dinamik Satırlara Uygun)
                     if r2.button("📄 İndir", key=f"dl_{_}"):
-                        p_v = json.loads(row['protokol_verisi'])
-                        all_c = []; t_r = 0; r89 = 0
-                        # Yeni liste yapısında gezin
+                        p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
                         for i, kart_list in enumerate(p_v, 1):
-                            # Eğer eski veri ise listeye çevir
                             if isinstance(kart_list, dict): kart_list = [kart_list]
                             for y_p in kart_list:
                                 kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
                                 if kd:
                                     t_r += 1
                                     if i in [8,9,10]: r89 += 1
-                                    for c in kd.replace(","," ").split(): all_c.append(c.strip())
+                                    for c in kd.split(): all_c.append(c.strip())
                         
                         counts = Counter(all_c)
-                        # Psikogram hesaplaması (Hızlı rapor için)
-                        calc = {"%G": (counts["G"]/t_r)*100 if t_r>0 else 0} # vb...
-                        doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, calc, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
+                        doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
                         bio = BytesIO(); doc.save(bio)
                         st.download_button("Dosyayı Al", bio.getvalue(), f"{row['hasta_adi']}.docx")
 
                     if r3.button("🗑️ Sil", key=f"d_{_}"):
                         cell = patient_sheet.find(row['hasta_adi']); patient_sheet.delete_rows(cell.row); st.rerun()
+            else: st.info("Kayıt yok.")
         else:
             if st.button("← Geri Dön", type="primary"): st.session_state['editing_patient'] = None; st.rerun()
             analysis_form(st.session_state['editing_patient'])
