@@ -64,15 +64,15 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* Alt kutu stili */
-    .yanit-alt-kutu {
-        padding: 15px;
+    /* Yanıt Alt Kutusu */
+    .yanit-kutu {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
         border-radius: 8px;
-        border: 1px solid #eee;
-        background-color: #fafafa;
-        margin-bottom: 15px;
+        padding: 15px;
+        margin-bottom: 10px;
     }
-    
+
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -162,8 +162,8 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # Renk Paleti (Canlı Renkler)
-    renkler = ["#3498db", "#e74c3c", "#9b59b6", "#34495e", "#1abc9c", "#27ae60", "#f1c40f", "#e67e22", "#d35400", "#7f8c8d"]
+    # KART RENKLERİ (Senin belirlediğin liste)
+    renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
     
     current_protocol = []
     cum_yanit_index = 1
@@ -171,74 +171,67 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         kart_rengi = renkler[i-1]
         
-        # KART ANA KUTU (Tüm içeriği saran 4 taraflı çerçeve)
-        st.markdown(f'''
-            <div style="
-                border: 3px solid {kart_rengi}; 
-                border-radius: 12px; 
-                padding: 20px; 
-                margin-bottom: 30px;
-                background-color: #ffffff;
-                ">
-                <h3 style="color: {kart_rengi}; margin-top: 0;">KART {i}</h3>
-        ''', unsafe_allow_html=True)
-        
-        kart_key = f"kart_data_{i}_{f_id}"
-        if kart_key not in st.session_state:
-            if raw_p:
-                try:
-                    old_val = raw_p[i-1]
-                    if isinstance(old_val, list): st.session_state[kart_key] = old_val
-                    else: st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
-                except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
-            else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
+        # --- ANA KUTU (Her şeyi saran yapı) ---
+        # Streamlit'in kendi border özelliği her şeyi bir arada tutar.
+        # Rengi başlıkta ve ayraçlarda veriyoruz.
+        with st.container(border=True):
+            
+            # Kart Başlığı (Renkli Zemin)
+            st.markdown(f'''
+                <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #333;">KART {i}</h3>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            kart_key = f"kart_data_{i}_{f_id}"
+            if kart_key not in st.session_state:
+                if raw_p:
+                    try:
+                        old_val = raw_p[i-1]
+                        if isinstance(old_val, list): st.session_state[kart_key] = old_val
+                        else: st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
+                    except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
+                else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-        # Yanıtlar Döngüsü
-        for idx, item in enumerate(st.session_state[kart_key]):
-            
-            # Yanıtları birbirinden ayıran kesikli çizgi
-            if idx > 0:
-                st.markdown(f'<div style="border-top: 2px dashed {kart_rengi}; margin: 20px 0;"></div>', unsafe_allow_html=True)
-            
-            st.write(f"**YANIT {cum_yanit_index}**")
-            
-            c_y, c_a = st.columns([1, 1])
-            item["y"] = c_y.text_area("Yanıt Metni", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
-            item["a"] = c_a.text_area("Anket Metni", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
-            
-            st.markdown("*Kod Seçimi:*")
-            g_cols = st.columns(4)
-            gruplar = [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel", GRUP_4)]
-            
-            current_codes = item["k"].split() if item["k"] else []
-            selected_from_lists = []
-            for g_idx, (g_name, g_list) in enumerate(gruplar):
-                with g_cols[g_idx]:
-                    chosen = st.multiselect(g_name, options=g_list, default=[c for c in current_codes if c in g_list], key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
-                    selected_from_lists.extend(chosen)
+            # Yanıtlar
+            for idx, item in enumerate(st.session_state[kart_key]):
+                
+                # Yanıt Kutusu
+                st.markdown(f'<div class="yanit-kutu">', unsafe_allow_html=True)
+                st.write(f"**YANIT {cum_yanit_index}**")
+                
+                c_y, c_a = st.columns([1, 1])
+                item["y"] = c_y.text_area("Yanıt Metni", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
+                item["a"] = c_a.text_area("Anket Metni", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
+                
+                st.markdown("*Kod Seçimi:*")
+                g_cols = st.columns(4)
+                gruplar = [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel", GRUP_4)]
+                
+                current_codes = item["k"].split() if item["k"] else []
+                selected_from_lists = []
+                for g_idx, (g_name, g_list) in enumerate(gruplar):
+                    with g_cols[g_idx]:
+                        chosen = st.multiselect(g_name, options=g_list, default=[c for c in current_codes if c in g_list], key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
+                        selected_from_lists.extend(chosen)
 
-            manual_codes = [c for c in current_codes if c not in TUM_GRUPLAR]
-            extra_input = st.text_input("Ekstra Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari vb.")
-            final_codes = selected_from_lists + extra_input.replace(",", " ").split()
-            item["k"] = " ".join(list(dict.fromkeys(final_codes)))
-            
-            if item["k"]: st.info(f"Seçili: {item['k']}")
+                manual_codes = [c for c in current_codes if c not in TUM_GRUPLAR]
+                extra_input = st.text_input("Ekstra Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari vb.")
+                final_codes = selected_from_lists + extra_input.replace(",", " ").split()
+                item["k"] = " ".join(list(dict.fromkeys(final_codes)))
+                
+                if item["k"]: st.info(f"Seçili: {item['k']}")
 
-            if len(st.session_state[kart_key]) > 1:
-                if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
-                    st.session_state[kart_key].pop(idx)
-                    st.rerun()
-            
-            cum_yanit_index += 1
+                if len(st.session_state[kart_key]) > 1:
+                    if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
+                        st.session_state[kart_key].pop(idx)
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+                cum_yanit_index += 1
 
-        # Yanıt Ekle Butonu (Kutunun içinde)
-        st.markdown(f'<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
-        if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
-            st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
-            st.rerun()
-            
-        # Kart Ana Kutu Kapanış
-        st.markdown('</div>', unsafe_allow_html=True)
+            if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
+                st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
+                st.rerun()
         
         current_protocol.append(st.session_state[kart_key])
 
