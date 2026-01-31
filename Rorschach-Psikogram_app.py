@@ -41,6 +41,12 @@ except Exception as e:
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
+    /* Sabit Kaydırma Ayarı */
+    .stMultiSelect div[role="listbox"] {
+        max-height: 300px !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+    }
     textarea { border: 1px solid #ced4da !important; border-radius: 5px !important; }
     .metric-container {
         height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -154,6 +160,8 @@ def analysis_form(edit_data=None):
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
     current_protocol = []
+    
+    cum_yanit_index = 1 # Global yanıt sayacı
 
     for i in range(1, 11):
         st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
@@ -161,13 +169,15 @@ def analysis_form(edit_data=None):
         kart_key = f"kart_data_{i}_{f_id}"
         if kart_key not in st.session_state:
             if raw_p:
-                old_val = raw_p[i-1]
-                if isinstance(old_val, dict): st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
-                else: st.session_state[kart_key] = old_val
+                try:
+                    old_val = raw_p[i-1]
+                    if isinstance(old_val, dict): st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
+                    else: st.session_state[kart_key] = old_val
+                except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
             else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
         for idx, item in enumerate(st.session_state[kart_key]):
-            st.write(f"**Yanıt {idx+1}:**")
+            st.write(f"**Yanıt {cum_yanit_index}:**")
             c_y, c_a = st.columns([1, 1])
             item["y"] = c_y.text_area("Yanıt", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
             item["a"] = c_a.text_area("Anket", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
@@ -177,32 +187,30 @@ def analysis_form(edit_data=None):
             g_cols = st.columns(4)
             gruplar = [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel", GRUP_4)]
             
-            # Mevcut kodları analiz et
             current_codes = item["k"].split() if item["k"] else []
             selected_from_lists = []
 
             for g_idx, (g_name, g_list) in enumerate(gruplar):
                 with g_cols[g_idx]:
-                    # Multiselect ile görsel panel (her zaman açık kutu)
                     defaults = [c for c in current_codes if c in g_list]
                     chosen = st.multiselect(g_name, options=g_list, default=defaults, key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
                     selected_from_lists.extend(chosen)
 
-            # Ekstra Kod Kutusu
             manual_codes = [c for c in current_codes if c not in TUM_GRUPLAR]
             extra_input = st.text_input("Ekstra / Manuel Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari, Sosyal vb.")
             
-            # Tümünü birleştir
             final_codes = selected_from_lists + extra_input.replace(",", " ").split()
-            item["k"] = " ".join(list(dict.fromkeys(final_codes))) # Sıralı ve eşsiz birleştirme
+            item["k"] = " ".join(list(dict.fromkeys(final_codes)))
             
-            st.info(f"Seçili Kodlar: {item['k'] if item['k'] else 'Yok'}")
+            if item["k"]: # Sadece kod varsa göster
+                st.info(f"Seçili Kodlar: {item['k']}")
 
             if len(st.session_state[kart_key]) > 1:
-                if st.button(f"K{i} - Yanıt {idx+1} Sil", key=f"del_{i}_{idx}_{f_id}"):
+                if st.button(f"K{i} - Yanıt {cum_yanit_index} Sil", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
             st.divider()
+            cum_yanit_index += 1 # Yanıt sayacını artır
 
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}"):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
@@ -211,15 +219,16 @@ def analysis_form(edit_data=None):
         st.markdown('</div>', unsafe_allow_html=True)
         current_protocol.append(st.session_state[kart_key])
 
-    # Kaydet ve Hesapla Butonları
-    if st.button("Sadece Kaydet"):
+    # Kaydet ve Hesapla
+    c_btn1, c_btn2 = st.columns(2)
+    if c_btn1.button("Sadece Kaydet", use_container_width=True):
         new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(current_protocol), tarih_str, b_reason, w_reason]
         if edit_data:
             cell = patient_sheet.find(edit_data['hasta_adi']); patient_sheet.update(f'A{cell.row}:J{cell.row}', [new_row])
         else: patient_sheet.append_row(new_row)
         st.success("Kaydedildi.")
 
-    if st.button("Psikogramı Hesapla"):
+    if c_btn2.button("Psikogramı Hesapla", use_container_width=True):
         all_c = []; total_r = 0; r_8910 = 0
         for i, kart_list in enumerate(current_protocol, 1):
             for y_p in kart_list:
@@ -251,7 +260,7 @@ def analysis_form(edit_data=None):
             
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
             bio = BytesIO(); diag.save(bio)
-            st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx")
+            st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx", use_container_width=True)
 
 # --- 6. NAVIGASYON ---
 if not st.session_state['logged_in']:
