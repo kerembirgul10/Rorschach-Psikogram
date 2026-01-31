@@ -81,7 +81,7 @@ if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now().timestamp()
 
-# --- 4. WORD RAPOR ---
+# --- 4. WORD RAPOR (DÜZELTİLDİ: YENİ VERİ YAPISINA UYGUN) ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verisi, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
@@ -92,24 +92,40 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_heading('Kart Tercihleri', level=1)
     doc.add_paragraph(f"Beğenilen Kartlar: {str(b_cards).replace('[','').replace(']','')}\nNeden: {b_reason}")
     doc.add_paragraph(f"Beğenilmeyen Kartlar: {str(w_cards).replace('[','').replace(']','')}\nNeden: {w_reason}")
+    
     doc.add_heading('Test Protokolü', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr = table.rows[0].cells
     hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
-    for i, kart_yanitlari in enumerate(protokol_verisi, 1):
-        for idx, y_paketi in enumerate(kart_yanitlari):
+    
+    # Protokol verisi içinde döngü (Yeni liste yapısını destekler)
+    for i, kart_data in enumerate(protokol_verisi, 1):
+        # Eğer veri eski tip (sözlük) ise listeye çevir, değilse olduğu gibi al
+        responses = [kart_data] if isinstance(kart_data, dict) else kart_data
+        
+        for idx, resp in enumerate(responses):
             row = table.add_row().cells
-            row[0].text = f"Kart {i}" if idx == 0 else ""
-            row[1].text = str(y_paketi.get('y', ''))
-            row[2].text = str(y_paketi.get('a', ''))
-            row[3].text = str(y_paketi.get('k', ''))
+            # Kart numarasını sadece o kartın ilk yanıtına yaz
+            row[0].text = str(i) if idx == 0 else ""
+            
+            # Hem eski ('yanit') hem yeni ('y') anahtarları destekle
+            y_text = resp.get('y', resp.get('yanit', ''))
+            a_text = resp.get('a', resp.get('anket', ''))
+            k_text = resp.get('k', resp.get('kodlar', ''))
+            
+            row[1].text = str(y_text)
+            row[2].text = str(a_text)
+            row[3].text = str(k_text)
+
     doc.add_heading('Psikogram Analizi', level=1)
     doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
+    
     doc.add_heading('Kod Frekansları', level=2)
     for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
         kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
         if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
+    
     return doc
 
 # --- 5. ANALIZ FORMU ---
@@ -153,25 +169,19 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # KART RENKLERİ (Mavi, Kırmızı, Mor vb.)
     renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
-    # Başlık metni için koyu renkler (Okunabilirlik için)
-    text_colors = ["#004085", "#721c24", "#3e007c", "#002752", "#004085", "#155724", "#856404", "#856404", "#721c24", "#383d41"]
-    
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
         kart_rengi = renkler[i-1]
-        text_rengi = text_colors[i-1]
         
-        # --- ANA KUTU (Standart Container, gri çerçeve YOK) ---
+        # --- ANA KUTU (Her şeyi saran renkli çerçeve) ---
         with st.container():
-            
-            # 1. BAŞLIK ŞERİDİ (Komple Renkli Kutu)
+            # 1. BAŞLIK ŞERİDİ (Renkli Dolu Zemin)
             st.markdown(f'''
-                <div style="background-color: {kart_rengi}; padding: 15px; border-radius: 10px 10px 0 0; margin-top: 20px; text-align: center;">
-                    <h3 style="margin: 0; color: {text_rengi};">KART {i}</h3>
+                <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 5px 5px 0 0; margin-top: 20px;">
+                    <h3 style="margin: 0; color: #333;">KART {i}</h3>
                 </div>
             ''', unsafe_allow_html=True)
             
@@ -185,15 +195,14 @@ def analysis_form(edit_data=None):
                     except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
                 else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-            # Yanıtlar Döngüsü
+            # 2. YANITLAR (Renkli çerçeve içinde)
+            # Yanıtların etrafını sarmak için HTML div açıyoruz
+            st.markdown(f'<div style="border-left: 4px solid {kart_rengi}; border-right: 4px solid {kart_rengi}; padding: 10px;">', unsafe_allow_html=True)
+
             for idx, item in enumerate(st.session_state[kart_key]):
-                
                 # Yanıtlar Arası Ayırıcı (Kart renginde Çizgi)
                 if idx > 0:
-                    st.markdown(f'''<hr style="border: 0; border-top: 4px solid {kart_rengi}; margin: 0;">''', unsafe_allow_html=True)
-                
-                # Yanıt İçeriği (Kenarları renkli çizgi ile kapalı hissi vermek için stil)
-                st.markdown(f'''<div style="border-left: 4px solid {kart_rengi}; border-right: 4px solid {kart_rengi}; padding: 15px;">''', unsafe_allow_html=True)
+                    st.markdown(f'''<hr style="border: 0; border-top: 3px solid {kart_rengi}; margin: 15px 0;">''', unsafe_allow_html=True)
                 
                 st.write(f"**YANIT {cum_yanit_index}**")
                 
@@ -223,19 +232,16 @@ def analysis_form(edit_data=None):
                     if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                         st.session_state[kart_key].pop(idx)
                         st.rerun()
-                
-                # HTML div kapatma
-                st.markdown('</div>', unsafe_allow_html=True)
                 cum_yanit_index += 1
 
-            # 3. ALT KAPATMA ÇİZGİSİ VE BUTON ALANI
-            # Yanıtlar bittiğinde alt tarafı kapatan renkli alan
+            # HTML div'i kapatıyoruz (Yanıtlar bitti)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # 3. ALT KAPATMA VE BUTON
             st.markdown(f'''
-                <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 0 0 10px 10px; margin-bottom: 30px;">
-                </div>
+                <div style="background-color: {kart_rengi}; padding: 8px; border-radius: 0 0 5px 5px; margin-bottom: 20px;"></div>
             ''', unsafe_allow_html=True)
             
-            # Butonu dışarıya (hemen altına) koyuyoruz ki HTML içinde kaybolmasın
             if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
                 st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
                 st.rerun()
@@ -327,9 +333,10 @@ else:
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
                     if r2.button("📄 İndir", key=f"dl_{_}"):
                         try:
+                            # WORD İÇİN GÜNCELLENMİŞ VERİ AYIKLAMA
                             p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
                             for i, kart_list in enumerate(p_v, 1):
-                                if isinstance(kart_list, dict): kart_list = [kart_list]
+                                if isinstance(kart_list, dict): kart_list = [kart_list] # Eski veri koruması
                                 for y_p in kart_list:
                                     kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
                                     if kd:
