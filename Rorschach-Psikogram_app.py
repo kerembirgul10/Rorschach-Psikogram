@@ -64,15 +64,6 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* Alt kutu stili */
-    .yanit-alt-kutu {
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #eee;
-        background-color: #fafafa;
-        margin-bottom: 15px;
-    }
-    
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -162,23 +153,21 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # KART RENKLERİ - Sadece çerçeve rengi olarak kullanılacak
-    renkler = ["#2980b9", "#c0392b", "#8e44ad", "#2c3e50", "#16a085", "#27ae60", "#f39c12", "#d35400", "#c0392b", "#7f8c8d"]
+    # Renk Paleti (Canlı Renkler)
+    renkler = ["#3498db", "#e74c3c", "#9b59b6", "#34495e", "#1abc9c", "#27ae60", "#f1c40f", "#e67e22", "#d35400", "#7f8c8d"]
     
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
-        # KART ANA KUTU: Renkli Çerçeve + Başlık
-        # İçerisi (background) şeffaf veya beyaz kalır, sadece border renklenir.
+        kart_rengi = renkler[i-1]
+        
+        # --- KART BAŞLANGIÇ ÇİZGİSİ VE BAŞLIK ---
+        # Üst tarafı kapatan kalın çizgi ve başlık
         st.markdown(f'''
-            <div style="
-                border: 3px solid {renkler[i-1]};
-                border-radius: 15px;
-                padding: 20px;
-                margin-bottom: 30px;
-                background-color: transparent;">
-                <h3 style="color: {renkler[i-1]}; margin-top:0;">KART {i}</h3>
+            <div style="border-top: 5px solid {kart_rengi}; padding-top: 10px; margin-top: 20px;">
+                <h3 style="color: {kart_rengi}; margin: 0;">KART {i}</h3>
+            </div>
         ''', unsafe_allow_html=True)
         
         kart_key = f"kart_data_{i}_{f_id}"
@@ -191,9 +180,13 @@ def analysis_form(edit_data=None):
                 except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
             else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
+        # Yanıtlar Döngüsü
         for idx, item in enumerate(st.session_state[kart_key]):
-            # YANIT ALT KUTU (Gri zeminli ayrıştırma)
-            st.markdown(f'<div class="yanit-alt-kutu">', unsafe_allow_html=True)
+            
+            # Yanıtlar arasında ve üstte ayrıştırıcı çizgi (İlk yanıt değilse araya çizgi at)
+            if idx > 0:
+                st.markdown(f'<div style="border-top: 2px dashed {kart_rengi}; margin: 20px 0;"></div>', unsafe_allow_html=True)
+            
             st.write(f"**YANIT {cum_yanit_index}**")
             
             c_y, c_a = st.columns([1, 1])
@@ -208,7 +201,6 @@ def analysis_form(edit_data=None):
             selected_from_lists = []
             for g_idx, (g_name, g_list) in enumerate(gruplar):
                 with g_cols[g_idx]:
-                    # Multiselect her zaman görünür
                     chosen = st.multiselect(g_name, options=g_list, default=[c for c in current_codes if c in g_list], key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
                     selected_from_lists.extend(chosen)
 
@@ -223,14 +215,21 @@ def analysis_form(edit_data=None):
                 if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True) # Yanıt Alt Kutu Kapanış
+            
             cum_yanit_index += 1
 
+        # Yanıt Ekle Butonu
+        st.markdown(f'<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
             st.rerun()
             
-        st.markdown('</div>', unsafe_allow_html=True) # Kart Ana Kutu (Çerçeve) Kapanış
+        # --- KART BİTİŞ ÇİZGİSİ ---
+        # Alt tarafı kapatan kalın çizgi (Çerçeveyi tamamlar)
+        st.markdown(f'''
+            <div style="border-bottom: 5px solid {kart_rengi}; margin-bottom: 40px; margin-top: 10px;"></div>
+        ''', unsafe_allow_html=True)
+        
         current_protocol.append(st.session_state[kart_key])
 
     # Alt Menü Butonları
