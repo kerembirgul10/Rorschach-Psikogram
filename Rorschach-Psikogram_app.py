@@ -41,6 +41,7 @@ except Exception as e:
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
+    /* Çoklu seçim kutusu kaydırma ayarı */
     .stMultiSelect div[role="listbox"] {
         max-height: 300px !important;
         overflow-y: auto !important;
@@ -63,27 +64,13 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* KART ÇERÇEVE VE RENK AYARI */
-    .kart-ana-kutu {
-        padding: 25px;
-        border-radius: 15px;
-        margin-bottom: 30px;
-        border: 1.5px solid rgba(0,0,0,0.3) !important; /* Her yönden saran ince çerçeve */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
+    /* Alt kutu stili */
     .yanit-alt-kutu {
-        background-color: rgba(255, 255, 255, 0.6);
         padding: 15px;
-        border-radius: 10px;
-        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 8px;
+        border: 1px solid #eee;
+        background-color: #fafafa;
         margin-bottom: 15px;
-    }
-    .kart-baslik {
-        font-size: 20px;
-        font-weight: 800;
-        margin-bottom: 15px;
-        display: block;
-        color: #000;
     }
     
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
@@ -175,16 +162,23 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # ESKİ RENKLER LİSTESİ (Arka planlar için)
-    renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
+    # KART RENKLERİ - Sadece çerçeve rengi olarak kullanılacak
+    renkler = ["#2980b9", "#c0392b", "#8e44ad", "#2c3e50", "#16a085", "#27ae60", "#f39c12", "#d35400", "#c0392b", "#7f8c8d"]
+    
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
-        # KART ANA KUTU (Eski renkler + her yönden saran ince çerçeve)
+        # KART ANA KUTU: Renkli Çerçeve + Başlık
+        # İçerisi (background) şeffaf veya beyaz kalır, sadece border renklenir.
         st.markdown(f'''
-            <div class="kart-ana-kutu" style="background-color: {renkler[i-1]};">
-                <span class="kart-baslik">KART {i}</span>
+            <div style="
+                border: 3px solid {renkler[i-1]};
+                border-radius: 15px;
+                padding: 20px;
+                margin-bottom: 30px;
+                background-color: transparent;">
+                <h3 style="color: {renkler[i-1]}; margin-top:0;">KART {i}</h3>
         ''', unsafe_allow_html=True)
         
         kart_key = f"kart_data_{i}_{f_id}"
@@ -198,7 +192,7 @@ def analysis_form(edit_data=None):
             else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
         for idx, item in enumerate(st.session_state[kart_key]):
-            # YANIT ALT KUTU
+            # YANIT ALT KUTU (Gri zeminli ayrıştırma)
             st.markdown(f'<div class="yanit-alt-kutu">', unsafe_allow_html=True)
             st.write(f"**YANIT {cum_yanit_index}**")
             
@@ -214,6 +208,7 @@ def analysis_form(edit_data=None):
             selected_from_lists = []
             for g_idx, (g_name, g_list) in enumerate(gruplar):
                 with g_cols[g_idx]:
+                    # Multiselect her zaman görünür
                     chosen = st.multiselect(g_name, options=g_list, default=[c for c in current_codes if c in g_list], key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
                     selected_from_lists.extend(chosen)
 
@@ -228,14 +223,14 @@ def analysis_form(edit_data=None):
                 if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True) # Yanıt Alt Kutu Kapanış
             cum_yanit_index += 1
 
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
             st.rerun()
             
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True) # Kart Ana Kutu (Çerçeve) Kapanış
         current_protocol.append(st.session_state[kart_key])
 
     # Alt Menü Butonları
@@ -272,7 +267,7 @@ def analysis_form(edit_data=None):
             st.write("**Kod Frekansları:**")
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
                 kds = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
-                if kds: st.write(f"**{g_n}:** " + " | ".join(kodlar))
+                if kds: st.write(f"**{g_n}:** " + " | ".join(kds))
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
             bio = BytesIO(); diag.save(bio)
             st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx", use_container_width=True)
