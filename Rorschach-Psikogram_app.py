@@ -37,17 +37,18 @@ except Exception as e:
     st.error(f"Baglanti hatasi: {e}")
     st.stop()
 
-# --- 3. TASARIM ---
+# --- 3. TASARIM (GÖRSEL AYRIŞTIRMA EKLENDİ) ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
-    /* Sabit Kaydırma Ayarı */
     .stMultiSelect div[role="listbox"] {
         max-height: 300px !important;
         overflow-y: auto !important;
         overscroll-behavior: contain !important;
     }
     textarea { border: 1px solid #ced4da !important; border-radius: 5px !important; }
+    
+    /* Psikogram Kutuları */
     .metric-container {
         height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center;
         border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #1a1a1a;
@@ -62,8 +63,33 @@ st.markdown("""
     .c-h { background-color: #D1A3FF; border: 2px solid #8E44AD; }
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
-    .kart-wrapper { padding: 30px; border-radius: 15px; margin-bottom: 30px; border: 1px solid rgba(0,0,0,0.1); }
-    .kart-title-top { font-size: 20px; font-weight: 800; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 15px; color: #000000 !important; }
+
+    /* KART VE YANIT AYRIŞTIRMA STİLLERİ */
+    .kart-ana-kutu {
+        padding: 25px;
+        border-radius: 20px;
+        margin-bottom: 40px;
+        border: 4px solid; /* Renk dinamik gelecek */
+        background-color: #ffffff;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+    .yanit-alt-kutu {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 12px;
+        border-left: 5px solid #dee2e6;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .kart-baslik {
+        font-size: 24px;
+        font-weight: 900;
+        margin-bottom: 20px;
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
     [data-testid="stSidebar"] { display: none; }
     button[kind="primary"] { background-color: #2ECC71 !important; color: white !important; border: none !important; }
@@ -89,16 +115,13 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_paragraph(f"Yaş: {h_info.get('age', '---')}\nUygulama Tarihi: {selected_date}")
     doc.add_heading('Klinik Yorumlar', level=2)
     doc.add_paragraph(h_info.get('comment', '---'))
-    
     doc.add_heading('Kart Tercihleri', level=1)
     doc.add_paragraph(f"Beğenilen Kartlar: {str(b_cards).replace('[','').replace(']','')}\nNeden: {b_reason}")
     doc.add_paragraph(f"Beğenilmeyen Kartlar: {str(w_cards).replace('[','').replace(']','')}\nNeden: {w_reason}")
-
     doc.add_heading('Test Protokolü', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr = table.rows[0].cells
     hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
-    
     for i, kart_yanitlari in enumerate(protokol_verisi, 1):
         for idx, y_paketi in enumerate(kart_yanitlari):
             row = table.add_row().cells
@@ -106,16 +129,13 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
             row[1].text = str(y_paketi.get('y', ''))
             row[2].text = str(y_paketi.get('a', ''))
             row[3].text = str(y_paketi.get('k', ''))
-
     doc.add_heading('Psikogram Analizi', level=1)
     doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
-    
     doc.add_heading('Kod Frekansları', level=2)
     for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
         kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
         if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
-    
     return doc
 
 # --- 5. ANALIZ FORMU ---
@@ -158,13 +178,18 @@ def analysis_form(edit_data=None):
     st.divider()
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
-    renkler = ["#D1E9FF", "#FFD1D1", "#E9D1FF", "#D1D5FF", "#D1FFF9", "#DFFFDE", "#FFFBD1", "#FFE8D1", "#FFD1C2", "#E2E2E2"]
-    current_protocol = []
     
-    cum_yanit_index = 1 # Global yanıt sayacı
+    # KART RENKLERİ (Çerçeveler için)
+    kart_renkleri = ["#3498db", "#e74c3c", "#9b59b6", "#34495e", "#1abc9c", "#27ae60", "#f1c40f", "#e67e22", "#d35400", "#7f8c8d"]
+    current_protocol = []
+    cum_yanit_index = 1
 
     for i in range(1, 11):
-        st.markdown(f'<div class="kart-wrapper" style="background-color:{renkler[i-1]};"><span class="kart-title-top">KART {i}</span>', unsafe_allow_html=True)
+        # Her Kart İçin Renkli Çerçeveli Ana Kutu Başlatma
+        st.markdown(f'''
+            <div class="kart-ana-kutu" style="border-color: {kart_renkleri[i-1]};">
+                <span class="kart-baslik" style="color: {kart_renkleri[i-1]};">KART {i}</span>
+        ''', unsafe_allow_html=True)
         
         kart_key = f"kart_data_{i}_{f_id}"
         if kart_key not in st.session_state:
@@ -177,46 +202,44 @@ def analysis_form(edit_data=None):
             else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
         for idx, item in enumerate(st.session_state[kart_key]):
-            st.write(f"**Yanıt {cum_yanit_index}:**")
-            c_y, c_a = st.columns([1, 1])
-            item["y"] = c_y.text_area("Yanıt", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
-            item["a"] = c_a.text_area("Anket", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
+            # Her Yanıt İçin Alt Kutu
+            st.markdown(f'<div class="yanit-alt-kutu">', unsafe_allow_html=True)
+            st.write(f"**YANIT {cum_yanit_index}**")
             
-            # --- SEÇMELİ KOD PANELİ ---
+            c_y, c_a = st.columns([1, 1])
+            item["y"] = c_y.text_area("Yanıt Metni", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
+            item["a"] = c_a.text_area("Anket Metni", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
+            
             st.markdown("*Kod Seçimi:*")
             g_cols = st.columns(4)
             gruplar = [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel", GRUP_4)]
             
             current_codes = item["k"].split() if item["k"] else []
             selected_from_lists = []
-
             for g_idx, (g_name, g_list) in enumerate(gruplar):
                 with g_cols[g_idx]:
-                    defaults = [c for c in current_codes if c in g_list]
-                    chosen = st.multiselect(g_name, options=g_list, default=defaults, key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
+                    chosen = st.multiselect(g_name, options=g_list, default=[c for c in current_codes if c in g_list], key=f"ms_{i}_{idx}_{g_idx}_{f_id}")
                     selected_from_lists.extend(chosen)
 
             manual_codes = [c for c in current_codes if c not in TUM_GRUPLAR]
-            extra_input = st.text_input("Ekstra / Manuel Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari, Sosyal vb.")
-            
+            extra_input = st.text_input("Ekstra Kodlar", value=" ".join(manual_codes), key=f"extra_{i}_{idx}_{f_id}", placeholder="Mimari vb.")
             final_codes = selected_from_lists + extra_input.replace(",", " ").split()
             item["k"] = " ".join(list(dict.fromkeys(final_codes)))
             
-            if item["k"]: # Sadece kod varsa göster
-                st.info(f"Seçili Kodlar: {item['k']}")
+            if item["k"]: st.info(f"Seçili: {item['k']}")
 
             if len(st.session_state[kart_key]) > 1:
-                if st.button(f"K{i} - Yanıt {cum_yanit_index} Sil", key=f"del_{i}_{idx}_{f_id}"):
+                if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
-            st.divider()
-            cum_yanit_index += 1 # Yanıt sayacını artır
+            st.markdown('</div>', unsafe_allow_html=True) # Yanıt Alt Kutu Kapanış
+            cum_yanit_index += 1
 
-        if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}"):
+        if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
             st.rerun()
             
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True) # Kart Ana Kutu Kapanış
         current_protocol.append(st.session_state[kart_key])
 
     # Kaydet ve Hesapla
@@ -236,13 +259,11 @@ def analysis_form(edit_data=None):
                     total_r += 1
                     if i in [8, 9, 10]: r_8910 += 1
                     for c in y_p["k"].split(): all_c.append(c.strip())
-        
         if total_r > 0:
             counts = Counter(all_c)
             calc = {"%G": (counts["G"]/total_r)*100, "%D": (counts["D"]/total_r)*100, "%F": (sum(counts[k] for k in ["F", "F+", "F-", "F+-"])/total_r)*100, "%A": ((counts["A"]+counts["Ad"])/total_r)*100, "%H": ((counts["H"]+counts["Hd"])/total_r)*100, "RC": (r_8910/total_r)*100}
             p_tri = (counts.get("FC",0)+counts.get("FC'",0)+counts.get("Fclob",0))*0.5 + (counts.get("CF",0)+counts.get("C'F",0)+counts.get("ClobF",0))*1 + (counts.get("C",0)+counts.get("C'",0)+counts.get("Clob",0))*1.5
             calc["TRI"] = (counts["K"]/p_tri)*100 if p_tri > 0 else 0
-            
             st.subheader(f"Psikogram Analizi (R: {total_r})")
             m = st.columns(7)
             m[0].markdown(f'<div class="metric-container c-g"><div class="metric-label">%G</div><div class="metric-value">%{calc["%G"]:.0f}</div></div>', unsafe_allow_html=True)
@@ -252,12 +273,10 @@ def analysis_form(edit_data=None):
             m[4].markdown(f'<div class="metric-container c-h"><div class="metric-label">%H</div><div class="metric-value">%{calc["%H"]:.0f}</div></div>', unsafe_allow_html=True)
             m[5].markdown(f'<div class="metric-container c-tri"><div class="metric-label">TRI</div><div class="metric-value">%{calc["TRI"]:.0f}</div></div>', unsafe_allow_html=True)
             m[6].markdown(f'<div class="metric-container c-rc"><div class="metric-label">RC</div><div class="metric-value">%{calc["RC"]:.0f}</div></div>', unsafe_allow_html=True)
-
             st.write("**Kod Frekansları:**")
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
                 kds = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
                 if kds: st.write(f"**{g_n}:** " + " | ".join(kds))
-            
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
             bio = BytesIO(); diag.save(bio)
             st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx", use_container_width=True)
@@ -306,7 +325,6 @@ else:
                     r1, r2, r3 = st.columns([3, 1, 1])
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-                    
                     if r2.button("📄 İndir", key=f"dl_{_}"):
                         p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
                         for i, kart_list in enumerate(p_v, 1):
@@ -317,12 +335,10 @@ else:
                                     t_r += 1
                                     if i in [8,9,10]: r89 += 1
                                     for c in kd.split(): all_c.append(c.strip())
-                        
                         counts = Counter(all_c)
                         doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
                         bio = BytesIO(); doc.save(bio)
                         st.download_button("Dosyayı Al", bio.getvalue(), f"{row['hasta_adi']}.docx")
-
                     if r3.button("🗑️ Sil", key=f"d_{_}"):
                         cell = patient_sheet.find(row['hasta_adi']); patient_sheet.delete_rows(cell.row); st.rerun()
             else: st.info("Kayıt yok.")
