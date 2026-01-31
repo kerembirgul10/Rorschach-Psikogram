@@ -37,7 +37,7 @@ except Exception as e:
     st.error(f"Baglanti hatasi: {e}")
     st.stop()
 
-# --- 3. TASARIM (GÖRSEL AYRIŞTIRMA EKLENDİ) ---
+# --- 3. TASARIM (YENİLENMİŞ İNCE ÇERÇEVE SİSTEMİ) ---
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
@@ -64,30 +64,28 @@ st.markdown("""
     .c-tri { background-color: #74B9FF; border: 2px solid #0984E3; }
     .c-rc { background-color: #55E6C1; border: 2px solid #20BF6B; }
 
-    /* KART VE YANIT AYRIŞTIRMA STİLLERİ */
+    /* YENİ KART TASARIMI: HER YÖNDEN SARAN İNCE ÇERÇEVE */
     .kart-ana-kutu {
-        padding: 25px;
-        border-radius: 20px;
-        margin-bottom: 40px;
-        border: 4px solid; /* Renk dinamik gelecek */
-        background-color: #ffffff;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 35px;
+        border: 2px solid; /* Renk dinamik, kalınlık 2px */
+        background-color: rgba(255, 255, 255, 0.5); /* Hafif şeffaf iç alan */
     }
     .yanit-alt-kutu {
-        background-color: #f8f9fa;
+        background-color: #ffffff;
         padding: 15px;
-        border-radius: 12px;
-        border-left: 5px solid #dee2e6;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
     }
     .kart-baslik {
-        font-size: 24px;
-        font-weight: 900;
-        margin-bottom: 20px;
+        font-size: 20px;
+        font-weight: 800;
+        margin-bottom: 15px;
         display: block;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
     }
     
     .footer { position: fixed; left: 0; bottom: 10px; width: 100%; text-align: center; color: #7f8c8d; font-size: 13px; }
@@ -179,13 +177,13 @@ def analysis_form(edit_data=None):
     
     raw_p = json.loads(edit_data['protokol_verisi']) if (edit_data and 'protokol_verisi' in edit_data) else None
     
-    # KART RENKLERİ (Çerçeveler için)
+    # KART RENKLERİ (İnce Çerçeveler İçin)
     kart_renkleri = ["#3498db", "#e74c3c", "#9b59b6", "#34495e", "#1abc9c", "#27ae60", "#f1c40f", "#e67e22", "#d35400", "#7f8c8d"]
     current_protocol = []
     cum_yanit_index = 1
 
     for i in range(1, 11):
-        # Her Kart İçin Renkli Çerçeveli Ana Kutu Başlatma
+        # KART ANA KUTU (HER YÖNDEN SARAN İNCE ÇERÇEVE)
         st.markdown(f'''
             <div class="kart-ana-kutu" style="border-color: {kart_renkleri[i-1]};">
                 <span class="kart-baslik" style="color: {kart_renkleri[i-1]};">KART {i}</span>
@@ -196,13 +194,13 @@ def analysis_form(edit_data=None):
             if raw_p:
                 try:
                     old_val = raw_p[i-1]
-                    if isinstance(old_val, dict): st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
-                    else: st.session_state[kart_key] = old_val
+                    if isinstance(old_val, list): st.session_state[kart_key] = old_val
+                    else: st.session_state[kart_key] = [{"y": old_val.get("yanit",""), "a": old_val.get("anket",""), "k": old_val.get("kodlar","")}]
                 except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
             else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
         for idx, item in enumerate(st.session_state[kart_key]):
-            # Her Yanıt İçin Alt Kutu
+            # YANIT ALT KUTU
             st.markdown(f'<div class="yanit-alt-kutu">', unsafe_allow_html=True)
             st.write(f"**YANIT {cum_yanit_index}**")
             
@@ -232,17 +230,17 @@ def analysis_form(edit_data=None):
                 if st.button(f"Sil (Yanıt {cum_yanit_index})", key=f"del_{i}_{idx}_{f_id}"):
                     st.session_state[kart_key].pop(idx)
                     st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True) # Yanıt Alt Kutu Kapanış
+            st.markdown('</div>', unsafe_allow_html=True)
             cum_yanit_index += 1
 
         if st.button(f"➕ Yanıt Ekle (Kart {i})", key=f"add_{i}_{f_id}", use_container_width=True):
             st.session_state[kart_key].append({"y": "", "a": "", "k": ""})
             st.rerun()
             
-        st.markdown('</div>', unsafe_allow_html=True) # Kart Ana Kutu Kapanış
+        st.markdown('</div>', unsafe_allow_html=True)
         current_protocol.append(st.session_state[kart_key])
 
-    # Kaydet ve Hesapla
+    # Alt Menü Butonları
     c_btn1, c_btn2 = st.columns(2)
     if c_btn1.button("Sadece Kaydet", use_container_width=True):
         new_row = [st.session_state['user'], h_isim, h_yas, h_yorum, json.dumps(b_cards), json.dumps(w_cards), json.dumps(current_protocol), tarih_str, b_reason, w_reason]
@@ -326,19 +324,21 @@ else:
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
                     if r2.button("📄 İndir", key=f"dl_{_}"):
-                        p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
-                        for i, kart_list in enumerate(p_v, 1):
-                            if isinstance(kart_list, dict): kart_list = [kart_list]
-                            for y_p in kart_list:
-                                kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
-                                if kd:
-                                    t_r += 1
-                                    if i in [8,9,10]: r89 += 1
-                                    for c in kd.split(): all_c.append(c.strip())
-                        counts = Counter(all_c)
-                        doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
-                        bio = BytesIO(); doc.save(bio)
-                        st.download_button("Dosyayı Al", bio.getvalue(), f"{row['hasta_adi']}.docx")
+                        try:
+                            p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
+                            for i, kart_list in enumerate(p_v, 1):
+                                if isinstance(kart_list, dict): kart_list = [kart_list]
+                                for y_p in kart_list:
+                                    kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
+                                    if kd:
+                                        t_r += 1
+                                        if i in [8,9,10]: r89 += 1
+                                        for c in kd.split(): all_c.append(c.strip())
+                            counts = Counter(all_c)
+                            doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
+                            bio = BytesIO(); doc.save(bio)
+                            st.download_button("Dosyayı Al", bio.getvalue(), f"{row['hasta_adi']}.docx")
+                        except: r2.write("Hata")
                     if r3.button("🗑️ Sil", key=f"d_{_}"):
                         cell = patient_sheet.find(row['hasta_adi']); patient_sheet.delete_rows(cell.row); st.rerun()
             else: st.info("Kayıt yok.")
