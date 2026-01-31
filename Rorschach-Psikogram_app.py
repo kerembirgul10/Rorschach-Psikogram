@@ -15,7 +15,7 @@ except ImportError:
     pass
 
 # --- 1. GRUP TANIMLARI ---
-GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl"]
+GRUP_1 = ["G", "D", "Dd", "Gbl", "Dbl", "Ddbl"]
 GRUP_2 = ["F", "F+", "F-", "F+-", "FC", "FC'", "Fclob", "C", "C'", "Clob", "CF", "C'F", "ClobF", "K", "Kan", "Kob", "Kp", "E", "EF", "FE"]
 GRUP_3 = ["H", "Hd", "(H)", "A", "Ad", "(A)", "Nesne", "Bitki", "Anatomi", "Coğrafya", "Doğa"]
 GRUP_4 = ["Ban", "Reddetme", "Şok", "Pop", "O", "V"]
