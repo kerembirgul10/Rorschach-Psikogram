@@ -41,7 +41,6 @@ except Exception as e:
 st.set_page_config(page_title="Rorschach Klinik Panel", layout="wide")
 st.markdown("""
     <style>
-    /* Çoklu seçim kutusu kaydırma ayarı */
     .stMultiSelect div[role="listbox"] {
         max-height: 300px !important;
         overflow-y: auto !important;
@@ -81,7 +80,7 @@ if 'page' not in st.session_state: st.session_state['page'] = "Hastalarim"
 if 'editing_patient' not in st.session_state: st.session_state['editing_patient'] = None
 if 'form_id' not in st.session_state: st.session_state['form_id'] = datetime.now().timestamp()
 
-# --- 4. WORD RAPOR (DÜZELTİLDİ: YENİ VERİ YAPISINA UYGUN) ---
+# --- 4. WORD RAPOR ---
 def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, protokol_verisi, selected_date):
     doc = Document()
     doc.add_heading(h_info['name'], 0)
@@ -92,27 +91,20 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_heading('Kart Tercihleri', level=1)
     doc.add_paragraph(f"Beğenilen Kartlar: {str(b_cards).replace('[','').replace(']','')}\nNeden: {b_reason}")
     doc.add_paragraph(f"Beğenilmeyen Kartlar: {str(w_cards).replace('[','').replace(']','')}\nNeden: {w_reason}")
-    
     doc.add_heading('Test Protokolü', level=1)
     table = doc.add_table(rows=1, cols=4); table.style = 'Table Grid'
     hdr = table.rows[0].cells
     hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Kart', 'Yanıt', 'Anket', 'Kodlar'
     
-    # Protokol verisi içinde döngü (Yeni liste yapısını destekler)
+    # Protokol verisi içinde döngü
     for i, kart_data in enumerate(protokol_verisi, 1):
-        # Eğer veri eski tip (sözlük) ise listeye çevir, değilse olduğu gibi al
         responses = [kart_data] if isinstance(kart_data, dict) else kart_data
-        
         for idx, resp in enumerate(responses):
             row = table.add_row().cells
-            # Kart numarasını sadece o kartın ilk yanıtına yaz
             row[0].text = str(i) if idx == 0 else ""
-            
-            # Hem eski ('yanit') hem yeni ('y') anahtarları destekle
             y_text = resp.get('y', resp.get('yanit', ''))
             a_text = resp.get('a', resp.get('anket', ''))
             k_text = resp.get('k', resp.get('kodlar', ''))
-            
             row[1].text = str(y_text)
             row[2].text = str(a_text)
             row[3].text = str(k_text)
@@ -120,12 +112,10 @@ def create_word_report(h_info, calc, counts, total_r, b_cards, w_cards, b_reason
     doc.add_heading('Psikogram Analizi', level=1)
     doc.add_paragraph(f"Toplam Yanıt Sayısı (R): {total_r}")
     for k, v in calc.items(): doc.add_paragraph(f"{k}: %{v:.1f}")
-    
     doc.add_heading('Kod Frekansları', level=2)
     for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
         kodlar = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
         if kodlar: doc.add_paragraph(f"{g_n}: " + " | ".join(kodlar))
-    
     return doc
 
 # --- 5. ANALIZ FORMU ---
@@ -176,9 +166,8 @@ def analysis_form(edit_data=None):
     for i in range(1, 11):
         kart_rengi = renkler[i-1]
         
-        # --- ANA KUTU (Her şeyi saran renkli çerçeve) ---
         with st.container():
-            # 1. BAŞLIK ŞERİDİ (Renkli Dolu Zemin)
+            # 1. Başlık Şeridi
             st.markdown(f'''
                 <div style="background-color: {kart_rengi}; padding: 10px; border-radius: 5px 5px 0 0; margin-top: 20px;">
                     <h3 style="margin: 0; color: #333;">KART {i}</h3>
@@ -195,17 +184,14 @@ def analysis_form(edit_data=None):
                     except: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
                 else: st.session_state[kart_key] = [{"y": "", "a": "", "k": ""}]
 
-            # 2. YANITLAR (Renkli çerçeve içinde)
-            # Yanıtların etrafını sarmak için HTML div açıyoruz
+            # 2. Yanıtlar Çerçevesi
             st.markdown(f'<div style="border-left: 4px solid {kart_rengi}; border-right: 4px solid {kart_rengi}; padding: 10px;">', unsafe_allow_html=True)
 
             for idx, item in enumerate(st.session_state[kart_key]):
-                # Yanıtlar Arası Ayırıcı (Kart renginde Çizgi)
                 if idx > 0:
                     st.markdown(f'''<hr style="border: 0; border-top: 3px solid {kart_rengi}; margin: 15px 0;">''', unsafe_allow_html=True)
                 
                 st.write(f"**YANIT {cum_yanit_index}**")
-                
                 c_y, c_a = st.columns([1, 1])
                 item["y"] = c_y.text_area("Yanıt Metni", value=item["y"], key=f"y_{i}_{idx}_{f_id}", height=get_auto_height(item["y"]), label_visibility="collapsed")
                 item["a"] = c_a.text_area("Anket Metni", value=item["a"], key=f"a_{i}_{idx}_{f_id}", height=get_auto_height(item["a"]), label_visibility="collapsed")
@@ -234,10 +220,9 @@ def analysis_form(edit_data=None):
                         st.rerun()
                 cum_yanit_index += 1
 
-            # HTML div'i kapatıyoruz (Yanıtlar bitti)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # 3. ALT KAPATMA VE BUTON
+            # 3. Kapatma
             st.markdown(f'''
                 <div style="background-color: {kart_rengi}; padding: 8px; border-radius: 0 0 5px 5px; margin-bottom: 20px;"></div>
             ''', unsafe_allow_html=True)
@@ -283,9 +268,11 @@ def analysis_form(edit_data=None):
             for g_n, g_l in [("Lokalizasyon", GRUP_1), ("Belirleyiciler", GRUP_2), ("İçerik", GRUP_3), ("Özel Kodlar", GRUP_4)]:
                 kds = [f"{k}: {counts[k]}" for k in g_l if counts[k] > 0]
                 if kds: st.write(f"**{g_n}:** " + " | ".join(kds))
+            
+            # --- HIZLI WORD İNDİRME (YENİ HASTA EKRANI İÇİN) ---
             diag = create_word_report({'name':h_isim, 'age':h_yas, 'comment':h_yorum}, calc, counts, total_r, b_cards, w_cards, b_reason, w_reason, current_protocol, tarih_str)
-            bio = BytesIO(); diag.save(bio)
-            st.download_button("Word İndir", bio.getvalue(), f"{h_isim}.docx", use_container_width=True)
+            bio = BytesIO(); diag.save(bio); bio.seek(0)
+            st.download_button("Word İndir", bio, f"{h_isim}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
 
 # --- 6. NAVIGASYON ---
 if not st.session_state['logged_in']:
@@ -331,23 +318,29 @@ else:
                     r1, r2, r3 = st.columns([3, 1, 1])
                     if r1.button(row['hasta_adi'], key=f"e_{_}", use_container_width=True):
                         st.session_state['editing_patient'] = row.to_dict(); st.rerun()
-                    if r2.button("📄 İndir", key=f"dl_{_}"):
-                        try:
-                            # WORD İÇİN GÜNCELLENMİŞ VERİ AYIKLAMA
-                            p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
-                            for i, kart_list in enumerate(p_v, 1):
-                                if isinstance(kart_list, dict): kart_list = [kart_list] # Eski veri koruması
-                                for y_p in kart_list:
-                                    kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
-                                    if kd:
-                                        t_r += 1
-                                        if i in [8,9,10]: r89 += 1
-                                        for c in kd.split(): all_c.append(c.strip())
-                            counts = Counter(all_c)
-                            doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, {}, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
-                            bio = BytesIO(); doc.save(bio)
-                            st.download_button("Dosyayı Al", bio.getvalue(), f"{row['hasta_adi']}.docx")
-                        except: r2.write("Hata")
+                    
+                    # --- HIZLI WORD İNDİRME (DÜZELTİLDİ: DIRECT RENDER) ---
+                    try:
+                        p_v = json.loads(row['protokol_verisi']); all_c = []; t_r = 0; r89 = 0
+                        for i, kart_list in enumerate(p_v, 1):
+                            if isinstance(kart_list, dict): kart_list = [kart_list]
+                            for y_p in kart_list:
+                                kd = y_p.get('k','').strip() if 'k' in y_p else y_p.get('kodlar','').strip()
+                                if kd:
+                                    t_r += 1
+                                    if i in [8,9,10]: r89 += 1
+                                    for c in kd.split(): all_c.append(c.strip())
+                        counts = Counter(all_c)
+                        # Calc hesabı (Basit)
+                        calc = {"%G": (counts["G"]/t_r)*100 if t_r>0 else 0, "R": t_r} 
+                        
+                        doc = create_word_report({'name':row['hasta_adi'],'age':row['yas'],'comment':row['klinik_yorum']}, calc, counts, t_r, row['en_begendigi'], row['en_beğenmediği'], row['en_begendigi_neden'], row['en_beğenmediği_neden'], p_v, row['tarih'])
+                        bio = BytesIO(); doc.save(bio); bio.seek(0)
+                        
+                        r2.download_button("📄 İndir", data=bio, file_name=f"{row['hasta_adi']}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"dl_{_}")
+                    except Exception as e:
+                        r2.write("Hata")
+
                     if r3.button("🗑️ Sil", key=f"d_{_}"):
                         cell = patient_sheet.find(row['hasta_adi']); patient_sheet.delete_rows(cell.row); st.rerun()
             else: st.info("Kayıt yok.")
